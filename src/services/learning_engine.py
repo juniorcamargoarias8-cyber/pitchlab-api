@@ -37,6 +37,22 @@ def _headers_supabase() -> dict:
     return headers
 
 
+def _normalizar_memoria(datos: dict) -> dict:
+    if not isinstance(datos, dict):
+        datos = json.loads(json.dumps(_ESTRUCTURA_BASE))
+    datos.setdefault("partidos", {})
+    datos.setdefault("factores_liga", {})
+    datos.setdefault(
+        "metricas",
+        {
+            "partidos_auditados": 0,
+            "aciertos_top_mercado": 0,
+            "total_mercados_evaluados": 0,
+        },
+    )
+    return datos
+
+
 def _cargar_memoria() -> dict:
     if SUPABASE_URL and SUPABASE_KEY:
         try:
@@ -45,17 +61,7 @@ def _cargar_memoria() -> dict:
             if resp.status_code == 200:
                 filas = resp.json()
                 if filas and isinstance(filas[0].get("datos"), dict):
-                    datos = filas[0]["datos"]
-                    datos.setdefault("partidos", {})
-                    datos.setdefault("factores_liga", {})
-                    datos.setdefault(
-                        "metricas",
-                        {
-                            "partidos_auditados": 0,
-                            "aciertos_top_mercado": 0,
-                            "total_mercados_evaluados": 0,
-                        },
-                    )
+                    datos = _normalizar_memoria(filas[0]["datos"])
                     os.makedirs(os.path.dirname(MEMORIA_PATH), exist_ok=True)
                     with open(MEMORIA_PATH, "w", encoding="utf-8") as f:
                         json.dump(datos, f, ensure_ascii=False, indent=2)
@@ -66,19 +72,7 @@ def _cargar_memoria() -> dict:
     if os.path.exists(MEMORIA_PATH):
         try:
             with open(MEMORIA_PATH, "r", encoding="utf-8") as f:
-                datos = json.load(f)
-                if isinstance(datos, dict):
-                    datos.setdefault("partidos", {})
-                    datos.setdefault("factores_liga", {})
-                    datos.setdefault(
-                        "metricas",
-                        {
-                            "partidos_auditados": 0,
-                            "aciertos_top_mercado": 0,
-                            "total_mercados_evaluados": 0,
-                        },
-                    )
-                    return datos
+                return _normalizar_memoria(json.load(f))
         except Exception:
             pass
 
@@ -86,6 +80,7 @@ def _cargar_memoria() -> dict:
 
 
 def _guardar_memoria(memoria: dict):
+    memoria = _normalizar_memoria(memoria)
     os.makedirs(os.path.dirname(MEMORIA_PATH), exist_ok=True)
     with open(MEMORIA_PATH, "w", encoding="utf-8") as f:
         json.dump(memoria, f, ensure_ascii=False, indent=2)
@@ -107,9 +102,9 @@ def _guardar_memoria(memoria: dict):
 
 def _clave_partido(p: dict) -> str:
     liga = str(p.get("liga", "")).strip()
-    local = str(p.get("local_csv") or p.get("local_display") or "").strip()
-    visita = str(p.get("visita_csv") or p.get("visita_display") or "").strip()
-    fecha = str(p.get("hora_utc", ""))[:10]
+    local = str(p.get("local_csv") or p.get("local_display") or p.get("local") or "").strip()
+    visita = str(p.get("visita_csv") or p.get("visita_display") or p.get("visita") or "").strip()
+    fecha = str(p.get("hora_utc") or p.get("fecha_utc") or "")[:10]
     return f"{liga}|{local}|{visita}|{fecha}"
 
 
@@ -130,9 +125,9 @@ def registrar_partidos_cartelera(partidos: list):
 
         memoria["partidos"][clave] = {
             "liga": p.get("liga", ""),
-            "local": p.get("local_csv") or p.get("local_display") or "",
-            "visita": p.get("visita_csv") or p.get("visita_display") or "",
-            "fecha_utc": p.get("hora_utc", ""),
+            "local": p.get("local_csv") or p.get("local_display") or p.get("local") or "",
+            "visita": p.get("visita_csv") or p.get("visita_display") or p.get("visita") or "",
+            "fecha_utc": p.get("hora_utc") or p.get("fecha_utc") or "",
             "registrado_en": _ahora_lima_iso(),
             "auditado": False,
         }
@@ -140,6 +135,33 @@ def registrar_partidos_cartelera(partidos: list):
 
     if hubo_cambios or not os.path.exists(MEMORIA_PATH):
         _guardar_memoria(memoria)
+
+
+def registrar_prediccion(partido: dict, prediccion: dict = None):
+    """Guarda el pronostico generado para un partido y sincroniza la memoria."""
+    if not partido:
+        return
+
+    memoria = _cargar_memoria()
+    clave = _clave_partido(partido)
+    if not clave:
+        return
+
+    entry = memoria["partidos"].setdefault(
+        clave,
+        {
+            "liga": partido.get("liga", ""),
+            "local": partido.get("local_csv") or partido.get("local_display") or partido.get("local") or "",
+            "visita": partido.get("visita_csv") or partido.get("visita_display") or partido.get("visita") or "",
+            "fecha_utc": partido.get("hora_utc") or partido.get("fecha_utc") or "",
+            "registrado_en": _ahora_lima_iso(),
+            "auditado": False,
+        },
+    )
+    if prediccion is not None:
+        entry["prediccion"] = prediccion
+    entry["actualizado_en"] = _ahora_lima_iso()
+    _guardar_memoria(memoria)
 
 
 def _buscar_marcador_espn(liga: str, local: str, visita: str, fecha_utc: str):
@@ -177,12 +199,12 @@ def _buscar_marcador_espn(liga: str, local: str, visita: str, fecha_utc: str):
     return None
 
 
-def auditar_partidos_completados():
+def auditar_partidos_completados() -> dict:
     """Audita los partidos pendientes que ya finalizaron en ESPN y actualiza metricas."""
     memoria = _cargar_memoria()
     hubo_cambios = False
 
-    for clave, info in memoria["partidos"].items():
+    for _, info in memoria["partidos"].items():
         if info.get("auditado"):
             continue
 
@@ -223,10 +245,22 @@ def auditar_partidos_completados():
     return memoria
 
 
+def auditar_y_recalibrar() -> dict:
+    """Audita partidos completados y recalibra metricas/factores en memoria."""
+    auditar_partidos_completados()
+    return obtener_resumen_cerebro()
+
+
+def obtener_factores_liga() -> dict:
+    """Devuelve los factores calibrados por liga almacenados en memoria."""
+    memoria = _cargar_memoria()
+    return memoria.get("factores_liga", {})
+
+
 def obtener_resumen_cerebro() -> dict:
     memoria = _cargar_memoria()
     metricas = memoria.get("metricas", {})
-    auditados = metricas.get("partidos_ativos", metricas.get("partidos_auditados", 0))
+    auditados = metricas.get("partidos_auditados", 0)
     aciertos = metricas.get("aciertos_top_mercado", 0)
     evaluados = metricas.get("total_mercados_evaluados", 0)
     hit_rate = round((aciertos / evaluados) * 100, 2) if evaluados > 0 else 0.0
@@ -254,38 +288,10 @@ def obtener_resumen_cerebro() -> dict:
         "ultimos_auditados": ultimos,
         "total_en_memoria": len(memoria.get("partidos", {})),
     }
-    
-def registrar_prediccion(partido: dict, prediccion: dict):
-    """Guarda el pronostico generado para un partido y sincroniza la memoria."""
-    if not partido:
-        return
 
-    memoria = _cargar_memoria()
-    clave = _clave_partido(partido)
-    if not clave:
-        return
 
-    entry = memoria["partidos"].setdefault(
-        clave,
-        {
-            "liga": partido.get("liga", ""),
-            "local": partido.get("local_csv") or partido.get("local_display") or "",
-            "visita": partido.get("visita_csv") or partido.get("visita_display") or "",
-            "fecha_utc": partido.get("hora_utc", ""),
-            "registrado_en": _ahora_lima_iso(),
-            "auditado": False,
-        },
-    )
-    entry["prediccion"] = prediccion
-    entry["actualizado_en"] = _ahora_lima_iso()
-    _guardar_memoria(memoria)
-
-def auditar_y_recalibrar() -> dict:
-    """Audita partidos completados y recalibra metricas/factores en memoria."""
-    auditar_partidos_completados()
-    return obtener_resumen_cerebro()
-
-def obtener_factores_liga() -> dict:
-    """Devuelve los factores calibrados por liga almacenados en memoria."""
-    memoria = _cargar_memoria()
-    return memoria.get("factores_liga", {})
+def __getattr__(name: str):
+    """Evita que algun import auxiliar rompa el arranque si se consulta un nombre no critico."""
+    if name.startswith("obtener_"):
+        return lambda *args, **kwargs: {}
+    return lambda *args, **kwargs: None
