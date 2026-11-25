@@ -279,3 +279,8 @@ def registrar_prediccion(partido: dict, prediccion: dict):
     entry["prediccion"] = prediccion
     entry["actualizado_en"] = _ahora_lima_iso()
     _guardar_memoria(memoria)
+
+def auditar_y_recalibrar() -> dict:
+    """Audita partidos completados y recalibra metricas/factores en memoria."""
+    auditar_partidos_completados()
+    return obtener_resumen_cerebro()
