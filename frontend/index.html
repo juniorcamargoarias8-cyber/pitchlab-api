@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PitchLab • Predictor Futbolístico 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #090d16;
+            --bg-card: #111827;
+            --bg-card-hover: #1a2234;
+            --bg-input: #0f172a;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --emerald: #10b981;
+            --emerald-glow: rgba(16, 185, 129, 0.16);
+            --amber: #f59e0b;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --cyan: #06b6d4;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        /* Navbar */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 32px;
+            background: rgba(17, 24, 39, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            font-size: 1.25rem;
+            letter-spacing: -0.02em;
+        }
+
+        .brand-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #06281e;
+            font-weight: 900;
+            font-size: 1rem;
+        }
+
+        .brand span {
+            color: var(--emerald);
+        }
+
+        .badge-engine {
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: var(--emerald-glow);
+            color: var(--emerald);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1360px;
+            margin: 0 auto;
+            padding: 24px 32px 60px;
+        }
+
+        /* Top Controls */
+        .top-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .date-pills {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .date-pill {
+            padding: 8px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .date-pill:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .date-pill.active {
+            background: var(--emerald);
+            color: #052e22;
+            border-color: var(--emerald);
+        }
+
+        .btn-ticket {
+            padding: 8px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(6, 182, 212, 0.45);
+            background: rgba(6, 182, 212, 0.14);
+            color: #22d3ee;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-ticket:hover {
+            background: rgba(6, 182, 212, 0.25);
+        }
+
+        /* Manual Simulator Bar */
+        .sim-box {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            background: var(--bg-card);
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        select, button.btn-primary {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.85rem;
+            outline: none;
+            min-width: 150px;
+        }
+
+        button.btn-primary {
+            background: var(--emerald);
+            color: #052e22;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            padding: 9px 18px;
+            min-width: auto;
+            transition: opacity 0.2s;
+        }
+
+        button.btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        /* Tickets Panel */
+        #ticketsPanel {
+            display: none;
+            margin-bottom: 26px;
+            background: linear-gradient(180deg, #121c30 0%, #0e1524 100%);
+            border: 1px solid rgba(6, 182, 212, 0.35);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .tickets-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tickets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 18px;
+        }
+
+        .ticket-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 16px;
+        }
+
+        .ticket-box-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .ticket-badge {
+            font-size: 0.78rem;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 7px;
+            background: var(--emerald-glow);
+            color: var(--emerald);
+        }
+
+        .ticket-leg {
+            padding: 9px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.84rem;
+        }
+
+        .ticket-leg:last-child {
+            border-bottom: none;
+        }
+
+        .ticket-leg-top {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-secondary);
+            font-size: 0.76rem;
+            margin-bottom: 2px;
+        }
+
+        .ticket-leg-pick {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        /* Cartelera Grid */
+        .league-group {
+            margin-bottom: 28px;
+        }
+
+        .league-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .league-header img {
+            width: 22px;
+            height: 22px;
+            object-fit: contain;
+        }
+
+        .league-header h2 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .matches-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+            gap: 14px;
+        }
+
+        .match-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 16px;
+            cursor: pointer;
+            transition: transform 0.18s, border-color 0.18s, background 0.18s;
+        }
+
+        .match-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(16, 185, 129, 0.45);
+            background: var(--bg-card-hover);
+        }
+
+        .match-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .match-teams {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .team-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 0.92rem;
+        }
+
+        .team-row img {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+        }
+
+        /* Analysis View */
+        #analysisView {
+            display: none;
+        }
+
+        .analysis-topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .btn-back {
+            padding: 8px 16px;
+            border-radius: 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .btn-back:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .window-pills {
+            display: flex;
+            gap: 6px;
+            background: var(--bg-card);
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .win-pill {
+            padding: 6px 12px;
+            border-radius: 7px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .win-pill.active {
+            background: var(--emerald);
+            color: #052e22;
+        }
+
+        /* Hero Match Header */
+        .hero-card {
+            background: linear-gradient(180deg, #131c31 0%, #0f1626 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 26px;
+            margin-bottom: 20px;
+        }
+
+        .hero-teams {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .hero-team {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            min-width: 160px;
+            gap: 10px;
+        }
+
+        .hero-team img {
+            width: 64px;
+            height: 64px;
+            object-fit: contain;
+        }
+
+        .hero-team h3 {
+            font-size: 1.15rem;
+            font-weight: 800;
+        }
+
+        .racha-dots {
+            display: flex;
+            gap: 5px;
+        }
+
+        .dot {
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dot-G { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .dot-E { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .dot-P { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+        .hero-center {
+            text-align: center;
+        }
+
+        .hero-score-box {
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--border-color);
+            padding: 10px 24px;
+            border-radius: 12px;
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: #38bdf8;
+            margin-bottom: 6px;
+        }
+
+        .hero-liga {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .xg-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            margin-top: 22px;
+            padding-top: 18px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .xg-item {
+            background: rgba(15, 23, 42, 0.65);
+            padding: 10px 12px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .xg-label {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .xg-val {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+
+        /* Context Card */
+        .context-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--emerald);
+            border-radius: 14px;
+            padding: 18px 22px;
+            margin-bottom: 20px;
+        }
+
+        .context-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .context-header h3 {
+            font-size: 0.98rem;
+            font-weight: 700;
+        }
+
+        .badge-marcador {
+            font-size: 0.78rem;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 8px;
+            background: var(--emerald-glow);
+            color: var(--emerald);
+        }
+
+        .context-lines p {
+            font-size: 0.86rem;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .context-alert {
+            margin-top: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #fbbf24;
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        /* Category Filter Chips */
+        .cat-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .cat-chip {
+            padding: 8px 16px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .cat-chip:hover {
+            color: var(--text-primary);
+            background: var(--bg-card-hover);
+        }
+
+        .cat-chip.active {
+            background: #06b6d4;
+            color: #042f2e;
+            border-color: #06b6d4;
+            font-weight: 700;
+        }
+
+        /* Main 2-Column Dashboard */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 960px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .card-title {
+            font-size: 0.96rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Probability Bars */
+        .prob-row {
+            margin-bottom: 14px;
+        }
+
+        .prob-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+        }
+
+        .prob-pct {
+            font-weight: 800;
+        }
+
+        .prob-track {
+            width: 100%;
+            height: 7px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .prob-fill {
+            height: 100%;
+            border-radius: 999px;
+            transition: width 0.35s ease;
+        }
+
+        /* Comparison Table */
+        .comp-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.84rem;
+        }
+
+        .comp-table th, .comp-table td {
+            padding: 9px 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .comp-table th {
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .comp-table td:first-child {
+            text-align: left;
+            font-weight: 700;
+            color: var(--emerald);
+        }
+
+        .comp-table td:nth-child(2) {
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .comp-table td:last-child {
+            text-align: right;
+            font-weight: 700;
+            color: #38bdf8;
+        }
+
+        /* H2H List */
+        .h2h-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.82rem;
+        }
+
+        .h2h-score {
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.07);
+        }
+
+        .loader {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="brand">
+            <div class="brand-icon">P</div>
+            <div>Pitch<span>Lab</span></div>
+        </div>
+        <div class="badge-engine">Motor Híbrido Poisson + ML • Cerebro 2026</div>
+    </nav>
+
+    <div class="container">
+        <!-- VISTA 1: CARTELERA, TICKETS Y SIMULADOR -->
+        <div id="homeView">
+            <div class="top-bar">
+                <div class="date-pills">
+                    <div id="datePills" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+                    <button class="btn-ticket" onclick="generarTicketDia()">🎟️ Armar Ticket Óptimo</button>
+                </div>
+
+                <div class="sim-box">
+                    <select id="selLiga" onchange="cargarEquiposLiga()">
+                        <option value="">Cargando ligas...</option>
+                    </select>
+                    <select id="selLocal">
+                        <option value="">Equipo Local</option>
+                    </select>
+                    <select id="selVisita">
+                        <option value="">Equipo Visitante</option>
+                    </select>
+                    <button class="btn-primary" onclick="simularManual()">Analizar</button>
+                </div>
+            </div>
+
+            <!-- Panel Generador de Tickets -->
+            <div id="ticketsPanel">
+                <div class="tickets-header">
+                    <h3 style="font-size:1rem; font-weight:800; color:#22d3ee;">🎟️ Combinadas Recomendadas (1 selección por partido • Sin correlación)</h3>
+                    <button onclick="document.getElementById('ticketsPanel').style.display='none'" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:0.85rem;">Cerrar ✕</button>
+                </div>
+                <div id="ticketsBody" class="tickets-grid"></div>
+            </div>
+
+            <div id="carteleraContainer">
+                <div class="loader">Cargando cartelera oficial desde ESPN...</div>
+            </div>
+        </div>
+
+        <!-- VISTA 2: ANÁLISIS DETALLADO -->
+        <div id="analysisView">
+            <div class="analysis-topbar">
+                <button class="btn-back" onclick="volverCartelera()">← Volver a la cartelera</button>
+                <div class="window-pills">
+                    <button class="win-pill" onclick="cambiarVentana(5, this)">Últimos 5</button>
+                    <button class="win-pill" onclick="cambiarVentana(10, this)">Últimos 10</button>
+                    <button class="win-pill active" onclick="cambiarVentana(0, this)">Ponderado 23–26</button>
+                </div>
+            </div>
+
+            <div class="hero-card">
+                <div class="hero-teams">
+                    <div class="hero-team">
+                        <img id="heroLogoL" src="" alt="" onerror="this.style.display='none'">
+                        <h3 id="heroNameL">Local</h3>
+                        <div class="racha-dots" id="rachaL"></div>
+                    </div>
+
+                    <div class="hero-center">
+                        <div class="hero-score-box" id="heroTime">--:--</div>
+                        <div class="hero-liga" id="heroLiga">Liga</div>
+                    </div>
+
+                    <div class="hero-team">
+                        <img id="heroLogoV" src="" alt="" onerror="this.style.display='none'">
+                        <h3 id="heroNameV">Visitante</h3>
+                        <div class="racha-dots" id="rachaV"></div>
+                    </div>
+                </div>
+
+                <div class="xg-grid" id="xgGrid"></div>
+            </div>
+
+            <!-- Contexto Clasificatorio -->
+            <div class="context-card">
+                <div class="context-header">
+                    <h3>🧠 Contexto Clasificatorio y Claves Deportivas</h3>
+                    <span class="badge-marcador" id="badgeMarcador">Marcador Previsto: -</span>
+                </div>
+                <div class="context-lines" id="contextLines"></div>
+                <div class="context-alert" id="contextAlert" style="display:none;"></div>
+            </div>
+
+            <!-- Filtros de Mercados -->
+            <div class="cat-bar">
+                <button class="cat-chip active" onclick="filtrarCategoria('todos', this)">Todos los Mercados</button>
+                <button class="cat-chip" onclick="filtrarCategoria('betano', this)">✅ Óptimo Betano (68–85%)</button>
+                <button class="cat-chip" onclick="filtrarCategoria('resultado', this)">1X2 y Doble Oportunidad</button>
+                <button class="cat-chip" onclick="filtrarCategoria('goles', this)">Goles y BTTS</button>
+                <button class="cat-chip" onclick="filtrarCategoria('corners', this)">Córners</button>
+                <button class="cat-chip" onclick="filtrarCategoria('tiros_tarjetas', this)">Tiros al Arco y Tarjetas</button>
+            </div>
+
+            <!-- Dashboard 2 Columnas -->
+            <div class="dashboard-grid">
+                <div class="card">
+                    <div class="card-title">🎯 Probabilidades Matemáticas (Poisson + ML)</div>
+                    <div id="poissonBarsContainer"></div>
+                </div>
+
+                <div>
+                    <div class="card" style="margin-bottom: 20px;">
+                        <div class="card-title">📊 Rendimiento Real por Condición</div>
+                        <table class="comp-table" id="compTable"></table>
+                    </div>
+
+                    <div class="card" style="margin-bottom: 20px;">
+                        <div class="card-title">⚔️ Enfrentamientos Directos (H2H)</div>
+                        <div id="h2hContainer"></div>
+                    </div>
+
+                    <div class="card">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--border-color);">
+                            <h3 style="margin:0; font-size:0.95rem;">🧠 Memoria & Aprendizaje (Hit Rate)</h3>
+                            <span id="brainHitRate" style="font-size:0.76rem; font-weight:700; padding:3px 9px; border-radius:6px; background:var(--emerald-glow); color:var(--emerald);">Cargando...</span>
+                        </div>
+                        <div id="brainBody" style="font-size:0.82rem; color:var(--text-secondary); line-height:1.5;">
+                            Sincronizando auditoría con ESPN...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let fechaSeleccionada = '';
+    let partidoActual = { liga: '', local: '', visita: '', hora: 'VS', logoL: '', logoV: '', fecha: '' };
+    let ventanaActual = 0;
+    let catActual = 'todos';
+    let prediccionData = null;
+
+    function formatearFechaAPI(dateObj) {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const d = String(dateObj.getDate()).padStart(2, '0');
+        return `${y}${m}${d}`;
+    }
+
+    function construirBarraFechas() {
+        const cont = document.getElementById('datePills');
+        const hoy = new Date();
+        const etiquetas = [
+            { offset: -1, texto: 'Ayer' },
+            { offset: 0, texto: 'Hoy' },
+            { offset: 1, texto: 'Mañana' },
+            { offset: 2, texto: '' },
+            { offset: 3, texto: '' },
+        ];
+
+        cont.innerHTML = etiquetas.map((item, idx) => {
+            const f = new Date(hoy);
+            f.setDate(hoy.getDate() + item.offset);
+            const fStr = formatearFechaAPI(f);
+            if (idx === 1) fechaSeleccionada = fStr;
+
+            const label = item.texto || f.toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: 'short' });
+            return `<button class="date-pill ${idx === 1 ? 'active' : ''}" onclick="seleccionarFecha('${fStr}', this)">${label}</button>`;
+        }).join('');
+    }
+
+    function seleccionarFecha(fStr, btn) {
+        document.querySelectorAll('.date-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        fechaSeleccionada = fStr;
+        document.getElementById('ticketsPanel').style.display = 'none';
+        cargarCartelera(fStr);
+    }
+
+    async function generarTicketDia() {
+        const panel = document.getElementById('ticketsPanel');
+        const body = document.getElementById('ticketsBody');
+        panel.style.display = 'block';
+        body.innerHTML = `<div class="loader" style="grid-column:1/-1;">Analizando partidos pendientes y cruzando probabilidades óptimas Betano...</div>`;
+
+        try {
+            const res = await fetch(`/api/ticket-optimo?fecha=${fechaSeleccionada}`);
+            const data = await res.json();
+
+            const renderTicket = (titulo, combo) => {
+                if (!combo || !combo.selecciones || combo.selecciones.length === 0) {
+                    return `<div class="ticket-box"><p style="color:var(--text-secondary); font-size:0.85rem;">No hay suficientes partidos pendientes con valor óptimo en esta fecha.</p></div>`;
+                }
+                const legsHtml = combo.selecciones.map(s => `
+                    <div class="ticket-leg">
+                        <div class="ticket-leg-top">
+                            <span>${s.partido} • ${s.liga}</span>
+                            <span>Prev: ${s.marcador_previsto}</span>
+                        </div>
+                        <div class="ticket-leg-pick">
+                            <span style="color:var(--emerald);">✓ ${s.mercado}</span>
+                            <span>${s.probabilidad}% <span style="color:var(--text-secondary); font-weight:500;">(~${s.cuota_estimada})</span></span>
+                        </div>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="ticket-box">
+                        <div class="ticket-box-head">
+                            <span style="font-weight:800; font-size:0.92rem;">${titulo}</span>
+                            <span class="ticket-badge">Cuota Est: ${combo.cuota_combinada_est}x • Prob: ${combo.probabilidad_conjunta}%</span>
+                        </div>
+                        ${legsHtml}
+                    </div>
+                `;
+            };
+
+            body.innerHTML =
+                renderTicket('🛡️ Ticket Conservador (3 Selecciones)', data.ticket_seguro_3) +
+                renderTicket('⚖️ Ticket Equilibrado (4 Selecciones)', data.ticket_equilibrado_4);
+        } catch (e) {
+            body.innerHTML = `<div class="loader" style="grid-column:1/-1;">Error al generar el ticket combinado.</div>`;
+        }
+    }
+
+    async function cargarCartelera(fStr) {
+        const cont = document.getElementById('carteleraContainer');
+        cont.innerHTML = `<div class="loader">Buscando partidos oficiales...</div>`;
+        try {
+            const res = await fetch(`/api/cartelera?fecha=${fStr}`);
+            const data = await res.json();
+            const partidos = data.partidos || [];
+
+            if (partidos.length === 0) {
+                cont.innerHTML = `<div class="loader">No hay partidos programados en las ligas monitoreadas para esta fecha.</div>`;
+                return;
+            }
+
+            const porLiga = {};
+            partidos.forEach(p => {
+                if (!porLiga[p.liga]) porLiga[p.liga] = { logo: p.liga_logo, items: [] };
+                porLiga[p.liga].items.push(p);
+            });
+
+            cont.innerHTML = Object.entries(porLiga).map(([liga, grupo]) => {
+                const cards = grupo.items.map(p => {
+                    const horaLocal = p.hora_utc
+                        ? new Date(p.hora_utc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : p.estado;
+                    return `
+                        <div class="match-card" onclick='abrirPartido(${JSON.stringify({
+                            liga: p.liga,
+                            local: p.local_csv,
+                            visita: p.visita_csv,
+                            hora: horaLocal,
+                            logoL: p.local_logo,
+                            logoV: p.visita_logo,
+                            fecha: p.hora_utc ? p.hora_utc.slice(0, 10) : ""
+                        })})'>
+                            <div class="match-meta">
+                                <span>${horaLocal}</span>
+                                <span>${p.estado}</span>
+                            </div>
+                            <div class="match-teams">
+                                <div class="team-row">
+                                    <img src="${p.local_logo}" alt="" onerror="this.style.display='none'">
+                                    <span>${p.local_display}</span>
+                                </div>
+                                <div class="team-row">
+                                    <img src="${p.visita_logo}" alt="" onerror="this.style.display='none'">
+                                    <span>${p.visita_display}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="league-group">
+                        <div class="league-header">
+                            ${grupo.logo ? `<img src="${grupo.logo}" alt="">` : ''}
+                            <h2>${liga}</h2>
+                        </div>
+                        <div class="matches-grid">${cards}</div>
+                    </div>
+                `;
+            }).join('');
+        } catch (e) {
+            cont.innerHTML = `<div class="loader">Error al cargar cartelera.</div>`;
+        }
+    }
+
+    async function cargarLigas() {
+        try {
+            const res = await fetch('/api/ligas');
+            const data = await res.json();
+            const sel = document.getElementById('selLiga');
+            sel.innerHTML = (data.ligas || []).map(l => `<option value="${l.nombre}">${l.nombre}</option>`).join('');
+            await cargarEquiposLiga();
+        } catch (e) {
+            console.error('Error cargando ligas:', e);
+        }
+    }
+
+    async function cargarEquiposLiga() {
+        const liga = document.getElementById('selLiga').value;
+        const selL = document.getElementById('selLocal');
+        const selV = document.getElementById('selVisita');
+        if (!liga) return;
+
+        selL.innerHTML = `<option value="">Cargando...</option>`;
+        selV.innerHTML = `<option value="">Cargando...</option>`;
+
+        try {
+            const res = await fetch(`/api/equipos?liga=${encodeURIComponent(liga)}`);
+            const data = await res.json();
+            const lista = data.equipos || [];
+
+            if (lista.length === 0) {
+                selL.innerHTML = `<option value="">Sin equipos</option>`;
+                selV.innerHTML = `<option value="">Sin equipos</option>`;
+                return;
+            }
+
+            const opts = lista.map(eq => `<option value="${eq}">${eq}</option>`).join('');
+            selL.innerHTML = opts;
+            selV.innerHTML = opts;
+            if (lista.length > 1) {
+                selV.selectedIndex = 1;
+            }
+        } catch (e) {
+            selL.innerHTML = `<option value="">Error al cargar</option>`;
+            selV.innerHTML = `<option value="">Error al cargar</option>`;
+        }
+    }
+
+    function simularManual() {
+        const liga = document.getElementById('selLiga').value;
+        const local = document.getElementById('selLocal').value;
+        const visita = document.getElementById('selVisita').value;
+        if (!liga || !local || !visita || local === visita) {
+            alert('Selecciona dos equipos distintos.');
+            return;
+        }
+        abrirPartido({ liga, local, visita, hora: 'Simulación', logoL: '', logoV: '', fecha: '' });
+    }
+
+    function volverCartelera() {
+        document.getElementById('analysisView').style.display = 'none';
+        document.getElementById('homeView').style.display = 'block';
+    }
+
+    function cambiarVentana(n, btn) {
+        document.querySelectorAll('.win-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        ventanaActual = n;
+        ejecutarPrediccion();
+    }
+
+    function filtrarCategoria(cat, btn) {
+        document.querySelectorAll('.cat-chip').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        catActual = cat;
+        if (prediccionData) renderizarBarrasPoisson();
+    }
+
+    function abrirPartido(info) {
+        partidoActual = info;
+        document.getElementById('homeView').style.display = 'none';
+        document.getElementById('analysisView').style.display = 'block';
+
+        document.getElementById('heroNameL').textContent = info.local;
+        document.getElementById('heroNameV').textContent = info.visita;
+        document.getElementById('heroTime').textContent = info.hora || 'VS';
+        document.getElementById('heroLiga').textContent = info.liga;
+
+        const imgL = document.getElementById('heroLogoL');
+        const imgV = document.getElementById('heroLogoV');
+        imgL.src = info.logoL || '';
+        imgL.style.display = info.logoL ? 'block' : 'none';
+        imgV.src = info.logoV || '';
+        imgV.style.display = info.logoV ? 'block' : 'none';
+
+        ejecutarPrediccion();
+    }
+
+    async function ejecutarPrediccion() {
+        document.getElementById('poissonBarsContainer').innerHTML = `<div class="loader">Calculando modelo híbrido Poisson + ML...</div>`;
+        try {
+            const url = `/api/predecir?liga=${encodeURIComponent(partidoActual.liga)}&local=${encodeURIComponent(partidoActual.local)}&visita=${encodeURIComponent(partidoActual.visita)}&ultimos_n=${ventanaActual}&fecha=${encodeURIComponent(partidoActual.fecha || '')}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('Error al obtener predicción');
+            prediccionData = await res.json();
+
+            renderizarAnalisis();
+            cargarCerebro();
+        } catch (e) {
+            document.getElementById('poissonBarsContainer').innerHTML = `<div class="loader">No se pudieron cargar los datos estadísticos para este encuentro.</div>`;
+        }
+    }
+
+    function renderizarAnalisis() {
+        const d = prediccionData;
+        const sl = d.stats_local;
+        const sv = d.stats_visita;
+        const esp = d.esperados;
+
+        if (sl.logo) {
+            const imgL = document.getElementById('heroLogoL');
+            imgL.src = sl.logo;
+            imgL.style.display = 'block';
+        }
+        if (sv.logo) {
+            const imgV = document.getElementById('heroLogoV');
+            imgV.src = sv.logo;
+            imgV.style.display = 'block';
+        }
+
+        document.getElementById('rachaL').innerHTML = (sl.racha || []).map(r => `<span class="dot dot-${r}">${r}</span>`).join('');
+        document.getElementById('rachaV').innerHTML = (sv.racha || []).map(r => `<span class="dot dot-${r}">${r}</span>`).join('');
+
+        let xgHtml = `
+            <div class="xg-item"><div class="xg-label">xG Local</div><div class="xg-val">${esp.goles_local}</div></div>
+            <div class="xg-item"><div class="xg-label">xG Visita</div><div class="xg-val">${esp.goles_visita}</div></div>
+            <div class="xg-item"><div class="xg-label">Goles Totales</div><div class="xg-val">${esp.goles_total}</div></div>
+        `;
+        if (esp.tiene_stats_avanzadas) {
+            xgHtml += `
+                <div class="xg-item"><div class="xg-label">Córners (L / V)</div><div class="xg-val">${esp.corners_local} / ${esp.corners_visita}</div></div>
+                <div class="xg-item"><div class="xg-label">Tiros Arco (L / V)</div><div class="xg-val">${esp.tiros_local} / ${esp.tiros_visita}</div></div>
+                <div class="xg-item"><div class="xg-label">Tarjetas Esp.</div><div class="xg-val">${esp.tarjetas_total}</div></div>
+            `;
+        }
+        document.getElementById('xgGrid').innerHTML = xgHtml;
+
+        // Contexto
+        document.getElementById('badgeMarcador').textContent = `Marcador Previsto: ${esp.marcador_probable} (Alt: ${esp.marcador_alternativo})`;
+        const cl = d.contexto_deportivo || d.claves_deportivas || {};
+        document.getElementById('contextLines').innerHTML = `
+            <p>${cl.clasificacion || ''}</p>
+            <p>${cl.dinamica || ''}</p>
+            <p>${cl.historial || ''}</p>
+            ${cl.tendencia ? `<p>${cl.tendencia}</p>` : ''}
+        `;
+
+        const alertBox = document.getElementById('contextAlert');
+        if (cl.alerta_correlacion) {
+            alertBox.textContent = cl.alerta_correlacion;
+            alertBox.style.display = 'block';
+        } else {
+            alertBox.style.display = 'none';
+        }
+
+        renderizarBarrasPoisson();
+
+        // Tabla comparativa
+        document.getElementById('compTable').innerHTML = `
+            <thead>
+                <tr>
+                    <th style="text-align:left;">${sl.equipo} (Local)</th>
+                    <th>Métrica</th>
+                    <th style="text-align:right;">${sv.equipo} (Visita)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>${sl.pct_ganar}%</td><td>% Victorias</td><td>${sv.pct_ganar}%</td></tr>
+                <tr><td>${sl.pct_doble_oport}%</td><td>Doble Oportunidad</td><td>${sv.pct_doble_oport}%</td></tr>
+                <tr><td>${sl.prom_goles_favor}</td><td>Goles a Favor</td><td>${sv.prom_goles_favor}</td></tr>
+                <tr><td>${sl.prom_goles_contra}</td><td>Goles Recibidos</td><td>${sv.prom_goles_contra}</td></tr>
+                <tr><td>${sl.pct_btts}%</td><td>Ambos Anotan</td><td>${sv.pct_btts}%</td></tr>
+                <tr><td>${sl.pct_clean_sheet}%</td><td>Portería a Cero</td><td>${sv.pct_clean_sheet}%</td></tr>
+                ${sl.tiene_stats_avanzadas ? `
+                    <tr><td>${sl.prom_corners_favor}</td><td>Córners a Favor</td><td>${sv.prom_corners_favor}</td></tr>
+                    <tr><td>${sl.prom_tiros_arco_favor}</td><td>Tiros al Arco</td><td>${sv.prom_tiros_arco_favor}</td></tr>
+                    <tr><td>${sl.prom_amarillas}</td><td>Amarillas / Partido</td><td>${sv.prom_amarillas}</td></tr>
+                ` : ''}
+            </tbody>
+        `;
+
+        // H2H
+        const h2h = d.h2h || { total: 0, partidos: [] };
+        if (h2h.total === 0) {
+            document.getElementById('h2hContainer').innerHTML = `<p style="color:var(--text-secondary); font-size:0.84rem;">No hay enfrentamientos directos registrados recientemente entre ambos clubes.</p>`;
+        } else {
+            document.getElementById('h2hContainer').innerHTML = `
+                <div style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:10px;">
+                    Últimos ${h2h.total} duelos: <b>${h2h.victorias_local}G</b> ${sl.equipo} • <b>${h2h.empates}E</b> • <b>${h2h.victorias_visita}G</b> ${sv.equipo}
+                </div>
+                ${h2h.partidos.map(p => `
+                    <div class="h2h-item">
+                        <span style="color:var(--text-secondary);">${p.fecha}</span>
+                        <span>${p.local} vs ${p.visita}</span>
+                        <span class="h2h-score">${p.goles_local} - ${p.goles_visita}</span>
+                    </div>
+                `).join('')}
+            `;
+        }
+    }
+
+    function renderizarBarrasPoisson() {
+        const filtrados = prediccionData.mercados.filter(m => {
+            const nom = m.mercado.toLowerCase();
+            if (catActual === 'betano') return m.probabilidad >= 68.0 && m.probabilidad <= 85.5;
+            if (catActual === 'resultado') return nom.includes('gana') || nom.includes('empate');
+            if (catActual === 'goles') return nom.includes('gol') || nom.includes('btts');
+            if (catActual === 'corners') return nom.includes('córner');
+            if (catActual === 'tiros_tarjetas') return nom.includes('tiros') || nom.includes('tarjeta');
+            return true;
+        });
+
+        if (filtrados.length === 0) {
+            document.getElementById('poissonBarsContainer').innerHTML =
+                `<p style="color:var(--text-secondary); font-size:0.86rem;">No hay mercados en este rango para el encuentro actual. Prueba en "Todos los Mercados".</p>`;
+            return;
+        }
+
+        document.getElementById('poissonBarsContainer').innerHTML = filtrados.map(m => {
+            let color = 'var(--text-secondary)';
+            let tag = '';
+            if (m.probabilidad > 85.5) {
+                color = 'var(--emerald)';
+                tag = `<span style="font-size:0.7rem; padding:1px 7px; border-radius:5px; background:rgba(148,163,184,0.14); color:var(--text-secondary); margin-left:6px;">Cuota baja</span>`;
+            } else if (m.probabilidad >= 68.0) {
+                color = 'var(--emerald)';
+                tag = `<span style="font-size:0.7rem; padding:1px 7px; border-radius:5px; background:var(--emerald-glow); color:var(--emerald); margin-left:6px;">✅ Rango Betano</span>`;
+            } else if (m.probabilidad >= 55.0) {
+                color = 'var(--amber)';
+            }
+
+            return `
+                <div class="prob-row">
+                    <div class="prob-head">
+                        <span>${m.mercado}${tag}</span>
+                        <span class="prob-pct" style="color:${color};">${m.probabilidad.toFixed(1)}%</span>
+                    </div>
+                    <div class="prob-track">
+                        <div class="prob-fill" style="width:${m.probabilidad}%; background:${color};"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async function cargarCerebro() {
+        try {
+            const res = await fetch('/api/cerebro');
+            const data = await res.json();
+            const m = data.metricas || {};
+            const hitEl = document.getElementById('brainHitRate');
+            const bodyEl = document.getElementById('brainBody');
+
+            hitEl.textContent = `Hit Rate: ${m.hit_rate_pct || 0}% (${m.aciertos_top_mercado || 0}/${m.total_mercados_evaluados || 0})`;
+
+            const ligasCalibradas = Object.keys(data.factores_por_liga || {});
+            const calText = ligasCalibradas.length > 0
+                ? `<div style="margin-bottom:8px; color:var(--emerald);">⚙️ Ligas calibradas automáticamente: <b>${ligasCalibradas.join(', ')}</b></div>`
+                : `<div style="margin-bottom:8px;">📊 En memoria: <b>${data.total_en_memoria || 0}</b> partidos (se calibra a partir de 2 auditados por liga).</div>`;
+
+            const ultimosHtml = (data.ultimos_auditados || []).slice().reverse().map(u => {
+                const pills = u.aciertos.map(a =>
+                    `<span style="display:inline-block; margin:2px 4px 2px 0; padding:2px 6px; border-radius:4px; font-size:0.74rem; background:${a.acertado ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color:${a.acertado ? '#34d399' : '#f87171'};">${a.acertado ? '✓' : '✗'} ${a.mercado}</span>`
+                ).join('');
+                return `<div style="padding:6px 0; border-top:1px solid rgba(255,255,255,0.06);">
+                    <div><b>${u.partido}</b> (${u.marcador}) <span style="opacity:0.7;">• ${u.liga}</span></div>
+                    <div style="margin-top:3px;">${pills}</div>
+                </div>`;
+            }).join('');
+
+            bodyEl.innerHTML = calText + (ultimosHtml || 'Abre partidos de la cartelera para comenzar a registrar y auditar.');
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // Inicialización
+    construirBarraFechas();
+    cargarLigas();
+    cargarCartelera(fechaSeleccionada);
+    cargarCerebro();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,112 @@
+[
+  {
+    "liga": "Premier League (Inglaterra)",
+    "local_csv": "Brentford",
+    "visita_csv": "Everton",
+    "local_display": "Brentford",
+    "visita_display": "Everton",
+    "hora_utc": "2026-11-23T20:00Z",
+    "estado": "Scheduled",
+    "completado": false
+  },
+  {
+    "liga": "LaLiga (España)",
+    "local_csv": "Levante",
+    "visita_csv": "Elche",
+    "local_display": "Levante",
+    "visita_display": "Elche",
+    "hora_utc": "2026-11-23T20:00Z",
+    "estado": "Scheduled",
+    "completado": false
+  },
+  {
+    "liga": "Serie A (Italia)",
+    "local_csv": "Monza",
+    "visita_csv": "Fiorentina",
+    "local_display": "Monza",
+    "visita_display": "Fiorentina",
+    "hora_utc": "2026-11-23T19:45Z",
+    "estado": "Scheduled",
+    "completado": false
+  },
+  {
+    "liga": "Super League (Grecia)",
+    "local_csv": "Asteras Tripolis",
+    "visita_csv": "Aris",
+    "local_display": "Asteras Tripoli",
+    "visita_display": "Aris",
+    "hora_utc": "2026-11-23T15:00Z",
+    "estado": "Scheduled",
+    "completado": false
+  },
+  {
+    "liga": "LaLiga Hypermotion (España 2ª)",
+    "local_csv": "Ceuta",
+    "visita_csv": "Almeria",
+    "local_display": "Ceuta",
+    "visita_display": "Almería",
+    "hora_utc": "2026-11-23T19:30Z",
+    "estado": "Scheduled",
+    "completado": false
+  },
+  {
+    "liga": "Ligue 2 (Francia 2ª)",
+    "local_csv": "Nantes",
+    "visita_csv": "Grenoble",
+    "local_display": "Nantes",
+    "visita_display": "Grenoble",
+    "hora_utc": "2026-11-23T19:45Z",
+    "estado": "Scheduled",
+    "completado": false
+  },
+  {
+    "liga": "Ligue 2 (Francia 2ª)",
+    "local_csv": "Sochaux",
+    "visita_csv": "Dunkerque",
+    "local_display": "Sochaux",
+    "visita_display": "Dunkerque",
+    "hora_utc": "2026-11-23T19:45Z",
+    "estado": "Scheduled",
+    "completado": false
+  },
+  {
+    "liga": "Liga Profesional (Argentina)",
+    "local_csv": "Gimnasia L.P.",
+    "visita_csv": "Newells Old Boys",
+    "local_display": "Gimnasia La Plata",
+    "visita_display": "Newell's Old Boys",
+    "hora_utc": "2026-11-23T20:00Z",
+    "estado": "Scheduled",
+    "completado": false
+  },
+  {
+    "liga": "Brasileirão Serie A (Brasil)",
+    "local_csv": "Internacional",
+    "visita_csv": "Vitoria",
+    "local_display": "Internacional",
+    "visita_display": "Vitória",
+    "hora_utc": "2026-11-23T22:30Z",
+    "estado": "Scheduled",
+    "completado": false
+  },
+  {
+    "liga": "Brasileirão Serie A (Brasil)",
+    "local_csv": "Botafogo RJ",
+    "visita_csv": "Sao Paulo",
+    "local_display": "Botafogo",
+    "visita_display": "São Paulo",
+    "hora_utc": "2026-11-23T23:00Z",
+    "estado": "Scheduled",
+    "completado": false
+  },
+  {
+    "liga": "Brasileirão Serie A (Brasil)",
+    "local_csv": "Santos",
+    "visita_csv": "Gremio",
+    "local_display": "Santos",
+    "visita_display": "Grêmio",
+    "hora_utc": "2026-11-24T00:00Z",
+    "estado": "Scheduled",
+    "completado": false
+  }
+]

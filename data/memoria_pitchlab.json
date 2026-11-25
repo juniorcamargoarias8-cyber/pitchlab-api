@@ -1,0 +1,131 @@
+{
+  "predicciones": {
+    "2026-11-25_Brasileirão Serie A (Brasil)_Atletico-MG_vs_Corinthians": {
+      "fecha": "2026-11-25",
+      "liga": "Brasileirão Serie A (Brasil)",
+      "local": "Atletico-MG",
+      "visita": "Corinthians",
+      "esperados": {
+        "goles_local": 1.34,
+        "goles_visita": 1.0,
+        "goles_total": 2.34,
+        "marcador_probable": "1-0",
+        "marcador_alternativo": "1-1",
+        "tiene_stats_avanzadas": true,
+        "ajuste_h2h_aplicado": true,
+        "corners_local": 5.25,
+        "corners_visita": 5.06,
+        "corners_total": 10.31,
+        "tiros_local": 3.62,
+        "tiros_visita": 4.12,
+        "tiros_total": 7.75,
+        "tarjetas_total": 5.36
+      },
+      "mercados_evaluados": [
+        {
+          "mercado": "Más de 7.5 Córners",
+          "probabilidad": 80.7
+        },
+        {
+          "mercado": "Menos de 3.5 Goles",
+          "probabilidad": 79.1
+        },
+        {
+          "mercado": "Más de 3.5 Tarjetas",
+          "probabilidad": 78.2
+        }
+      ],
+      "auditado": false,
+      "resultado_real": null,
+      "aciertos": [],
+      "timestamp": 1795642436
+    },
+    "2026-11-26_Liga MX (México)_Toluca_vs_Atlas": {
+      "fecha": "2026-11-26",
+      "liga": "Liga MX (México)",
+      "local": "Toluca",
+      "visita": "Atlas",
+      "esperados": {
+        "goles_local": 2.19,
+        "goles_visita": 1.46,
+        "goles_total": 3.65,
+        "marcador_probable": "2-1",
+        "marcador_alternativo": "1-1",
+        "tiene_stats_avanzadas": true,
+        "ajuste_h2h_aplicado": true,
+        "corners_local": 5.81,
+        "corners_visita": 5.0,
+        "corners_total": 10.81,
+        "tiros_local": 5.12,
+        "tiros_visita": 3.31,
+        "tiros_total": 8.44,
+        "tarjetas_total": 3.87
+      },
+      "mercados_evaluados": [
+        {
+          "mercado": "Más de 7.5 Córners",
+          "probabilidad": 84.4
+        },
+        {
+          "mercado": "12 (Cualquiera Gana)",
+          "probabilidad": 79.5
+        },
+        {
+          "mercado": "Más de 1.5 Goles",
+          "probabilidad": 78.7
+        }
+      ],
+      "auditado": false,
+      "resultado_real": null,
+      "aciertos": [],
+      "timestamp": 1795642437
+    },
+    "2026-11-26_Liga MX (México)_Monterrey_vs_Club America": {
+      "fecha": "2026-11-26",
+      "liga": "Liga MX (México)",
+      "local": "Monterrey",
+      "visita": "Club America",
+      "esperados": {
+        "goles_local": 1.71,
+        "goles_visita": 1.71,
+        "goles_total": 3.41,
+        "marcador_probable": "1-1",
+        "marcador_alternativo": "1-2",
+        "tiene_stats_avanzadas": true,
+        "ajuste_h2h_aplicado": true,
+        "corners_local": 6.19,
+        "corners_visita": 5.12,
+        "corners_total": 11.31,
+        "tiros_local": 5.69,
+        "tiros_visita": 5.38,
+        "tiros_total": 11.06,
+        "tarjetas_total": 3.39
+      },
+      "mercados_evaluados": [
+        {
+          "mercado": "Monterrey +0.5 Goles",
+          "probabilidad": 81.9
+        },
+        {
+          "mercado": "Más de 8.5 Córners",
+          "probabilidad": 79.4
+        },
+        {
+          "mercado": "12 (Cualquiera Gana)",
+          "probabilidad": 77.4
+        }
+      ],
+      "auditado": false,
+      "resultado_real": null,
+      "aciertos": [],
+      "timestamp": 1795642437
+    }
+  },
+  "factores_aprendidos": {},
+  "metricas_globales": {
+    "partidos_auditados": 0,
+    "aciertos_top_mercado": 0,
+    "total_mercados_evaluados": 0,
+    "hit_rate_pct": 0.0
+  }
+}
