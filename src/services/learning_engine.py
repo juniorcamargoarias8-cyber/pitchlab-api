@@ -2,11 +2,12 @@ import os
 import json
 import requests
 from datetime import datetime, timezone, timedelta
-from src.config import DATA_DIR
+from src.config import DATA_DIR, ESPN_TODAS_LIGAS
 
 MEMORIA_PATH = os.path.join(DATA_DIR, "memoria_pitchlab.json")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+_TZ_LIMA = timezone(timedelta(hours=-5))
 
 _ESTRUCTURA_BASE = {
     "partidos": {},
@@ -19,17 +20,22 @@ _ESTRUCTURA_BASE = {
 }
 
 
+def _ahora_lima_iso() -> str:
+    return datetime.now(_TZ_LIMA).isoformat()
+
+
 def _headers_supabase() -> dict:
-    return {
+    headers = {
         "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates",
     }
+    if SUPABASE_KEY.startswith("eyJ"):
+        headers["Authorization"] = f"Bearer {SUPABASE_KEY}"
+    return headers
 
 
 def _cargar_memoria() -> dict:
-    # 1. Intentar leer desde Supabase (persistencia permanente en la nube)
     if SUPABASE_URL and SUPABASE_KEY:
         try:
             url = f"{SUPABASE_URL}/rest/v1/pitchlab_estado?id=eq.principal&select=datos"
@@ -38,17 +44,39 @@ def _cargar_memoria() -> dict:
                 filas = resp.json()
                 if filas and isinstance(filas[0].get("datos"), dict):
                     datos = filas[0]["datos"]
+                    datos.setdefault("partidos", {})
+                    datos.setdefault("factores_liga", {})
+                    datos.setdefault(
+                        "metricas",
+                        {
+                            "partidos_auditados": 0,
+                            "aciertos_top_mercado": 0,
+                            "total_mercados_evaluados": 0,
+                        },
+                    )
+                    os.makedirs(os.path.dirname(MEMORIA_PATH), exist_ok=True)
                     with open(MEMORIA_PATH, "w", encoding="utf-8") as f:
                         json.dump(datos, f, ensure_ascii=False, indent=2)
                     return datos
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[SUPABASE LOAD ERROR] {e}")
 
-    # 2. Respaldo: leer archivo local si existe
     if os.path.exists(MEMORIA_PATH):
         try:
             with open(MEMORIA_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
+                datos = json.load(f)
+                if isinstance(datos, dict):
+                    datos.setdefault("partidos", {})
+                    datos.setdefault("factores_liga", {})
+                    datos.setdefault(
+                        "metricas",
+                        {
+                            "partidos_auditados": 0,
+                            "aciertos_top_mercado": 0,
+                            "total_mercados_evaluados": 0,
+                        },
+                    )
+                    return datos
         except Exception:
             pass
 
@@ -56,20 +84,171 @@ def _cargar_memoria() -> dict:
 
 
 def _guardar_memoria(memoria: dict):
-    # Guardar localmente como caché rápida
     os.makedirs(os.path.dirname(MEMORIA_PATH), exist_ok=True)
     with open(MEMORIA_PATH, "w", encoding="utf-8") as f:
         json.dump(memoria, f, ensure_ascii=False, indent=2)
 
-    # Sincronizar en Supabase
     if SUPABASE_URL and SUPABASE_KEY:
         try:
             url = f"{SUPABASE_URL}/rest/v1/pitchlab_estado"
             payload = {
                 "id": "principal",
                 "datos": memoria,
-                "actualizado_en": datetime.now(timezone(timedelta(hours=-5))).isoformat(),
+                "actualizado_en": _ahora_lima_iso(),
             }
-            requests.post(url, headers=_headers_supabase(), json=payload, timeout=6)
-        except Exception:
-            pass
+            r = requests.post(url, headers=_headers_supabase(), json=payload, timeout=8)
+            if r.status_code not in (200, 201, 204):
+                print(f"[SUPABASE ERROR] {r.status_code}: {r.text}")
+        except Exception as e:
+            print(f"[SUPABASE EXCEPTION] {e}")
+
+
+def _clave_partido(p: dict) -> str:
+    liga = str(p.get("liga", "")).strip()
+    local = str(p.get("local_csv") or p.get("local_display") or "").strip()
+    visita = str(p.get("visita_csv") or p.get("visita_display") or "").strip()
+    fecha = str(p.get("hora_utc", ""))[:10]
+    return f"{liga}|{local}|{visita}|{fecha}"
+
+
+def registrar_partidos_cartelera(partidos: list):
+    """Registra en memoria los partidos aun no completados para auditarlos al finalizar."""
+    if not partidos:
+        return
+
+    memoria = _cargar_memoria()
+    hubo_cambios = False
+
+    for p in partidos:
+        if p.get("completado"):
+            continue
+        clave = _clave_partido(p)
+        if not clave or clave in memoria["partidos"]:
+            continue
+
+        memoria["partidos"][clave] = {
+            "liga": p.get("liga", ""),
+            "local": p.get("local_csv") or p.get("local_display") or "",
+            "visita": p.get("visita_csv") or p.get("visita_display") or "",
+            "fecha_utc": p.get("hora_utc", ""),
+            "registrado_en": _ahora_lima_iso(),
+            "auditado": False,
+        }
+        hubo_cambios = True
+
+    if hubo_cambios or not os.path.exists(MEMORIA_PATH):
+        _guardar_memoria(memoria)
+
+
+def _buscar_marcador_espn(liga: str, local: str, visita: str, fecha_utc: str):
+    slug = ESPN_TODAS_LIGAS.get(liga)
+    if not slug:
+        return None
+
+    fecha_param = fecha_utc[:10].replace("-", "") if fecha_utc else datetime.now(_TZ_LIMA).strftime("%Y%m%d")
+    try:
+        url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard?dates={fecha_param}"
+        resp = requests.get(url, timeout=8).json()
+        for ev in resp.get("events", []):
+            comp = ev.get("competitions", [{}])[0]
+            if not comp.get("status", {}).get("type", {}).get("completed", False):
+                continue
+            competidores = comp.get("competitors", [])
+            if len(competidores) < 2:
+                continue
+
+            h_obj = next((c for c in competidores if c.get("homeAway") == "home"), competidores[0])
+            a_obj = next((c for c in competidores if c.get("homeAway") == "away"), competidores[1])
+
+            h_name = h_obj.get("team", {}).get("displayName", "").lower()
+            a_name = a_obj.get("team", {}).get("displayName", "").lower()
+
+            l_ok = local.lower() in h_name or h_name in local.lower()
+            v_ok = visita.lower() in a_name or a_name in visita.lower()
+
+            if l_ok and v_ok:
+                goles_local = int(float(h_obj.get("score", 0) or 0))
+                goles_visita = int(float(a_obj.get("score", 0) or 0))
+                return goles_local, goles_visita
+    except Exception:
+        pass
+    return None
+
+
+def auditar_partidos_completados():
+    """Audita los partidos pendientes que ya finalizaron en ESPN y actualiza metricas."""
+    memoria = _cargar_memoria()
+    hubo_cambios = False
+
+    for clave, info in memoria["partidos"].items():
+        if info.get("auditado"):
+            continue
+
+        marcador = _buscar_marcador_espn(
+            info.get("liga", ""),
+            info.get("local", ""),
+            info.get("visita", ""),
+            info.get("fecha_utc", ""),
+        )
+        if marcador is None:
+            continue
+
+        g_local, g_visita = marcador
+        total_goles = g_local + g_visita
+        acierto = total_goles >= 2
+
+        info["auditado"] = True
+        info["marcador"] = f"{g_local}-{g_visita}"
+        info["acierto_top_mercado"] = acierto
+        info["auditado_en"] = _ahora_lima_iso()
+
+        memoria["metricas"]["partidos_auditados"] += 1
+        memoria["metricas"]["total_mercados_evaluados"] += 1
+        if acierto:
+            memoria["metricas"]["aciertos_top_mercado"] += 1
+
+        liga = info.get("liga", "General")
+        fl = memoria["factores_liga"].setdefault(liga, {"auditados": 0, "aciertos": 0, "factor": 1.0})
+        fl["auditados"] += 1
+        if acierto:
+            fl["aciertos"] += 1
+        fl["factor"] = round(0.85 + 0.30 * (fl["aciertos"] / max(1, fl["auditados"])), 3)
+        hubo_cambios = True
+
+    if hubo_cambios:
+        _guardar_memoria(memoria)
+
+    return memoria
+
+
+def obtener_resumen_cerebro() -> dict:
+    memoria = _cargar_memoria()
+    metricas = memoria.get("metricas", {})
+    auditados = metricas.get("partidos_ativos", metricas.get("partidos_auditados", 0))
+    aciertos = metricas.get("aciertos_top_mercado", 0)
+    evaluados = metricas.get("total_mercados_evaluados", 0)
+    hit_rate = round((aciertos / evaluados) * 100, 2) if evaluados > 0 else 0.0
+
+    ultimos = [
+        {
+            "partido": f"{v.get('local', '')} vs {v.get('visita', '')}",
+            "liga": v.get("liga", ""),
+            "marcador": v.get("marcador", ""),
+            "acierto": v.get("acierto_top_mercado", False),
+            "auditado_en": v.get("auditado_en", ""),
+        }
+        for v in memoria.get("partidos", {}).values()
+        if v.get("auditado")
+    ][-10:]
+
+    return {
+        "metricas": {
+            "partidos_auditados": auditados,
+            "aciertos_top_mercado": aciertos,
+            "total_mercados_evaluados": evaluados,
+            "hit_rate_pct": hit_rate,
+        },
+        "factores_por_liga": memoria.get("factores_liga", {}),
+        "ultimos_auditados": ultimos,
+        "total_en_memoria": len(memoria.get("partidos", {})),
+    }
