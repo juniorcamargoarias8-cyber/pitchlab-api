@@ -284,3 +284,8 @@ def auditar_y_recalibrar() -> dict:
     """Audita partidos completados y recalibra metricas/factores en memoria."""
     auditar_partidos_completados()
     return obtener_resumen_cerebro()
+
+def obtener_factores_liga() -> dict:
+    """Devuelve los factores calibrados por liga almacenados en memoria."""
+    memoria = _cargar_memoria()
+    return memoria.get("factores_liga", {})
