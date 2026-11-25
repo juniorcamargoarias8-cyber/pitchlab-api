@@ -254,3 +254,28 @@ def obtener_resumen_cerebro() -> dict:
         "ultimos_auditados": ultimos,
         "total_en_memoria": len(memoria.get("partidos", {})),
     }
+    
+def registrar_prediccion(partido: dict, prediccion: dict):
+    """Guarda el pronostico generado para un partido y sincroniza la memoria."""
+    if not partido:
+        return
+
+    memoria = _cargar_memoria()
+    clave = _clave_partido(partido)
+    if not clave:
+        return
+
+    entry = memoria["partidos"].setdefault(
+        clave,
+        {
+            "liga": partido.get("liga", ""),
+            "local": partido.get("local_csv") or partido.get("local_display") or "",
+            "visita": partido.get("visita_csv") or partido.get("visita_display") or "",
+            "fecha_utc": partido.get("hora_utc", ""),
+            "registrado_en": _ahora_lima_iso(),
+            "auditado": False,
+        },
+    )
+    entry["prediccion"] = prediccion
+    entry["actualizado_en"] = _ahora_lima_iso()
+    _guardar_memoria(memoria)
