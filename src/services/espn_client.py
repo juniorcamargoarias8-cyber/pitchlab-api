@@ -3,7 +3,7 @@ import json
 import time
 import unicodedata
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.config import (
     CACHE_DIR,
@@ -15,6 +15,11 @@ from src.config import (
 
 _session = requests.Session()
 _session.headers.update({"User-Agent": "PitchLab/1.0"})
+_TZ_LIMA = timezone(timedelta(hours=-5))
+
+
+def _ahora_lima() -> datetime:
+    return datetime.now(_TZ_LIMA)
 
 
 def quitar_tildes(texto: str) -> str:
@@ -41,11 +46,14 @@ def obtener_info_espn_equipo(nombre_liga: str, equipo_csv: str):
         slugs_a_probar = [slug]
 
     eq_norm = normalizar_nombre(equipo_csv)
-    palabras_clave = [p for p in eq_norm.split() if len(p) >= 4 and p not in ("club", "deportivo", "atletico", "plata", "boys", "linz", "city")]
+    palabras_clave = [
+        p for p in eq_norm.split()
+        if len(p) >= 4 and p not in ("club", "deportivo", "atletico", "plata", "boys", "linz", "city")
+    ]
 
     for s_actual in slugs_a_probar:
         ruta_teams = os.path.join(CACHE_DIR, f"espn_teams_v2_{s_actual}.json")
-        if os.path.exists(ruta_teams):
+        if os.path.exists(ruta_teams) and (time.time() - os.path.getmtime(ruta_teams)) < 86400:
             with open(ruta_teams, "r", encoding="utf-8") as f:
                 teams_data = json.load(f)
         else:
@@ -81,8 +89,9 @@ def obtener_partidos_equipo_espn_global(espn_team_id: str, nombre_equipo: str) -
     if not espn_team_id:
         return []
 
-    ruta_cache = os.path.join(CACHE_DIR, f"espn_global_sched_v3_{espn_team_id}_{datetime.now().strftime('%Y-%m-%d')}.json")
-    if os.path.exists(ruta_cache):
+    fecha_lima = _ahora_lima().strftime("%Y-%m-%d")
+    ruta_cache = os.path.join(CACHE_DIR, f"espn_global_sched_v3_{espn_team_id}_{fecha_lima}.json")
+    if os.path.exists(ruta_cache) and (time.time() - os.path.getmtime(ruta_cache)) < 3600:
         with open(ruta_cache, "r", encoding="utf-8") as f:
             return json.load(f)
 
@@ -157,8 +166,9 @@ def _descargar_boxscore_individual(slug_usado: str, event_id: str):
 
 
 def _extraer_eventos_schedule(slug_s: str, espn_team_id: str) -> list:
-    ruta_sched = os.path.join(CACHE_DIR, f"espn_sched_v3_{slug_s}_{espn_team_id}_{datetime.now().strftime('%Y-%m-%d')}.json")
-    if os.path.exists(ruta_sched):
+    fecha_lima = _ahora_lima().strftime("%Y-%m-%d")
+    ruta_sched = os.path.join(CACHE_DIR, f"espn_sched_v3_{slug_s}_{espn_team_id}_{fecha_lima}.json")
+    if os.path.exists(ruta_sched) and (time.time() - os.path.getmtime(ruta_sched)) < 3600:
         with open(ruta_sched, "r", encoding="utf-8") as f:
             ev_temp = json.load(f)
     else:
@@ -184,7 +194,7 @@ def obtener_stats_espn_america(slug_liga: str, espn_team_id: str, ultimos_n: int
         return None
 
     es_torneo_continental = slug_liga in ("uefa.champions", "uefa.europa", "conmebol.libertadores")
-    ids_ponderados = []  # lista de tuplas (event_id, slug_usado, peso)
+    ids_ponderados = []
 
     if es_torneo_continental:
         ids_copa = _extraer_eventos_schedule(slug_liga, espn_team_id)[-ultimos_n:]
@@ -274,7 +284,7 @@ def obtener_stats_espn_america(slug_liga: str, espn_team_id: str, ultimos_n: int
 def descargar_partidos_torneo_espn(slug: str) -> list:
     """Obtiene los equipos y resultados de Champions/Europa/Libertadores desde ESPN Teams + Schedules."""
     ruta_cache = os.path.join(CACHE_DIR, f"espn_torneo_v3_{slug}.json")
-    if os.path.exists(ruta_cache) and (time.time() - os.path.getmtime(ruta_cache)) < 21600:
+    if os.path.exists(ruta_cache) and (time.time() - os.path.getmtime(ruta_cache)) < 7200:
         with open(ruta_cache, "r", encoding="utf-8") as f:
             return json.load(f)
 
@@ -340,7 +350,10 @@ def _emparejar_equipo_csv(nombre_espn: str, lista_equipos_csv: list):
         eq_csv_norm = normalizar_nombre(eq)
         if eq_csv_norm in espn_norm or espn_norm in eq_csv_norm:
             return eq
-    palabras_espn = [p for p in espn_norm.split() if len(p) >= 5 and p not in ("club", "deportivo", "atletico", "united", "sporting")]
+    palabras_espn = [
+        p for p in espn_norm.split()
+        if len(p) >= 5 and p not in ("club", "deportivo", "atletico", "united", "sporting")
+    ]
     for eq in lista_equipos_csv:
         eq_csv_norm = normalizar_nombre(eq)
         if any(p in eq_csv_norm for p in palabras_espn):
@@ -416,11 +429,15 @@ def _consultar_liga_cartelera(nombre_liga: str, slug: str, fecha_str: str, carga
 
 
 def obtener_cartelera_hoy(cargar_liga_fn, fecha_str: str = None):
+    hoy_lima = _ahora_lima().strftime("%Y%m%d")
     if not fecha_str:
-        fecha_str = datetime.now().strftime("%Y%m%d")
+        fecha_str = hoy_lima
+
+    # TTL dinámico: 60 segundos para la jornada de hoy (minutos en vivo / FT), 30 min para otros días
+    ttl_segundos = 60 if fecha_str == hoy_lima else 1800
 
     ruta_cache = os.path.join(CACHE_DIR, f"cartelera_v5_{fecha_str}.json")
-    if os.path.exists(ruta_cache) and (time.time() - os.path.getmtime(ruta_cache)) < 1800:
+    if os.path.exists(ruta_cache) and (time.time() - os.path.getmtime(ruta_cache)) < ttl_segundos:
         with open(ruta_cache, "r", encoding="utf-8") as f:
             return json.load(f)
 
@@ -434,7 +451,9 @@ def obtener_cartelera_hoy(cargar_liga_fn, fecha_str: str = None):
             partidos_detectados.extend(fut.result())
 
     orden_ligas = list(ESPN_TODAS_LIGAS.keys())
-    partidos_detectados.sort(key=lambda x: (orden_ligas.index(x["liga"]) if x["liga"] in orden_ligas else 99, x["hora_utc"]))
+    partidos_detectados.sort(
+        key=lambda x: (orden_ligas.index(x["liga"]) if x["liga"] in orden_ligas else 99, x["hora_utc"])
+    )
 
     with open(ruta_cache, "w", encoding="utf-8") as f:
         json.dump(partidos_detectados, f, ensure_ascii=False, indent=2)

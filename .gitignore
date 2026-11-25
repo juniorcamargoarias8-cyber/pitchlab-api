@@ -3,3 +3,5 @@ _backup_prototipos/
 .vscode/
 venv/
 .env
+data/cache/cartelera_*.json
+data/cache/espn_*.json
