@@ -2,8 +2,10 @@ import os
 import json
 import requests
 from datetime import datetime, timezone, timedelta
-from src.config import DATA_DIR, ESPN_TODAS_LIGAS
+from src.config import ESPN_TODAS_LIGAS
 
+_RAIZ_PROYECTO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+DATA_DIR = os.path.join(_RAIZ_PROYECTO, "data")
 MEMORIA_PATH = os.path.join(DATA_DIR, "memoria_pitchlab.json")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
