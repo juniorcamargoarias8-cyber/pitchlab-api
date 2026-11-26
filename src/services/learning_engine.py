@@ -102,76 +102,51 @@ def _guardar_memoria(memoria: dict):
             print(f"[SUPABASE EXCEPTION] {e}")
 
 
-def _clave_partido(p: dict) -> str:
-    liga = str(p.get("liga", "")).strip()
-    local = str(p.get("local_csv") or p.get("local_display") or p.get("local") or "").strip()
-    visita = str(p.get("visita_csv") or p.get("visita_display") or p.get("visita") or "").strip()
-    fecha = str(p.get("hora_utc") or p.get("fecha_utc") or "")[:10]
-    return f"{liga}|{local}|{visita}|{fecha}"
+def _armar_clave(liga: str, local: str, visita: str, fecha: str = "") -> str:
+    f_corto = str(fecha or "")[:10]
+    return f"{str(liga).strip()}|{str(local).strip()}|{str(visita).strip()}|{f_corto}"
 
 
-def registrar_partidos_cartelera(partidos: list):
-    """Registra en memoria los partidos aun no completados para auditarlos al finalizar."""
-    if not partidos:
+def registrar_prediccion(
+    liga: str,
+    local: str,
+    visita: str,
+    esperados: dict = None,
+    mercados: list = None,
+    fecha: str = "",
+):
+    """Guarda el pronostico generado para un partido y persiste la memoria."""
+    clave = _armar_clave(liga, local, visita, fecha)
+    if not clave.strip("|"):
         return
 
     memoria = _cargar_memoria()
-    hubo_cambios = False
-
-    for p in partidos:
-        if p.get("completado"):
-            continue
-        clave = _clave_partido(p)
-        if not clave or clave in memoria["partidos"]:
-            continue
-
-        memoria["partidos"][clave] = {
-            "liga": p.get("liga", ""),
-            "local": p.get("local_csv") or p.get("local_display") or p.get("local") or "",
-            "visita": p.get("visita_csv") or p.get("visita_display") or p.get("visita") or "",
-            "fecha_utc": p.get("hora_utc") or p.get("fecha_utc") or "",
-            "registrado_en": _ahora_lima_iso(),
-            "auditado": False,
-        }
-        hubo_cambios = True
-
-    if hubo_cambios or not os.path.exists(MEMORIA_PATH):
-        _guardar_memoria(memoria)
-
-
-def registrar_prediccion(partido: dict, prediccion: dict = None):
-    """Guarda el pronostico generado para un partido y sincroniza la memoria."""
-    if not partido:
-        return
-
-    memoria = _cargar_memoria()
-    clave = _clave_partido(partido)
-    if not clave:
-        return
-
     entry = memoria["partidos"].setdefault(
         clave,
         {
-            "liga": partido.get("liga", ""),
-            "local": partido.get("local_csv") or partido.get("local_display") or partido.get("local") or "",
-            "visita": partido.get("visita_csv") or partido.get("visita_display") or partido.get("visita") or "",
-            "fecha_utc": partido.get("hora_utc") or partido.get("fecha_utc") or "",
+            "liga": liga,
+            "local": local,
+            "visita": visita,
+            "fecha": str(fecha or "")[:10],
             "registrado_en": _ahora_lima_iso(),
             "auditado": False,
         },
     )
-    if prediccion is not None:
-        entry["prediccion"] = prediccion
+    if esperados is not None:
+        entry["esperados"] = esperados
+    if mercados is not None:
+        entry["mercados"] = mercados
+        entry["top_mercado"] = mercados[0] if mercados else None
     entry["actualizado_en"] = _ahora_lima_iso()
     _guardar_memoria(memoria)
 
 
-def _buscar_marcador_espn(liga: str, local: str, visita: str, fecha_utc: str):
+def _buscar_marcador_espn(liga: str, local: str, visita: str, fecha: str):
     slug = ESPN_TODAS_LIGAS.get(liga)
     if not slug:
         return None
 
-    fecha_param = fecha_utc[:10].replace("-", "") if fecha_utc else datetime.now(_TZ_LIMA).strftime("%Y%m%d")
+    fecha_param = fecha[:10].replace("-", "") if fecha else datetime.now(_TZ_LIMA).strftime("%Y%m%d")
     try:
         url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard?dates={fecha_param}"
         resp = requests.get(url, timeout=8).json()
@@ -214,7 +189,7 @@ def auditar_partidos_completados() -> dict:
             info.get("liga", ""),
             info.get("local", ""),
             info.get("visita", ""),
-            info.get("fecha_utc", ""),
+            info.get("fecha", ""),
         )
         if marcador is None:
             continue
@@ -245,18 +220,6 @@ def auditar_partidos_completados() -> dict:
         _guardar_memoria(memoria)
 
     return memoria
-
-
-def auditar_y_recalibrar() -> dict:
-    """Audita partidos completados y recalibra metricas/factores en memoria."""
-    auditar_partidos_completados()
-    return obtener_resumen_cerebro()
-
-
-def obtener_factores_liga() -> dict:
-    """Devuelve los factores calibrados por liga almacenados en memoria."""
-    memoria = _cargar_memoria()
-    return memoria.get("factores_liga", {})
 
 
 def obtener_resumen_cerebro() -> dict:
@@ -292,8 +255,16 @@ def obtener_resumen_cerebro() -> dict:
     }
 
 
-def __getattr__(name: str):
-    """Evita que algun import auxiliar rompa el arranque si se consulta un nombre no critico."""
-    if name.startswith("obtener_"):
-        return lambda *args, **kwargs: {}
-    return lambda *args, **kwargs: None
+def auditar_y_recalibrar() -> dict:
+    """Audita partidos completados y devuelve el estado actual del cerebro."""
+    auditar_partidos_completados()
+    return obtener_resumen_cerebro()
+
+
+def obtener_factores_liga(liga: str = None) -> dict:
+    """Devuelve los factores calibrados por liga (o el de una liga especifica)."""
+    memoria = _cargar_memoria()
+    factores = memoria.get("factores_liga", {})
+    if liga:
+        return factores.get(liga, {})
+    return factores
