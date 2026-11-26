@@ -56,7 +56,7 @@ def _normalizar_memoria(datos: dict) -> dict:
 def _cargar_memoria() -> dict:
     if SUPABASE_URL and SUPABASE_KEY:
         try:
-            url = f"{SUPABASE_URL}/rest/v1/pitchlab_estado?identificaci%C3%B3n=eq.principal&select=datos"
+            url = f"{SUPABASE_URL}/rest/v1/pitchlab_estado?id=eq.principal&select=datos"
             resp = requests.get(url, headers=_headers_supabase(), timeout=6)
             if resp.status_code == 200:
                 filas = resp.json()
@@ -89,9 +89,9 @@ def _guardar_memoria(memoria: dict):
 
     if SUPABASE_URL and SUPABASE_KEY:
         try:
-            url = f"{SUPABASE_URL}/rest/v1/pitchlab_estado?on_conflict=identificaci%C3%B3n"
+            url = f"{SUPABASE_URL}/rest/v1/pitchlab_estado?on_conflict=id"
             payload = {
-                "identificación": "principal",
+                "id": "principal",
                 "datos": memoria,
                 "actualizado_en": _ahora_lima_iso(),
             }
