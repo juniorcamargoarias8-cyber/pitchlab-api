@@ -115,7 +115,7 @@ def registrar_prediccion(
     mercados: list = None,
     fecha: str = "",
 ):
-    """Guarda el pronostico generado para un partido y persiste la memoria."""
+    """Guarda el pronóstico generado para un partido y persiste la memoria."""
     clave = _armar_clave(liga, local, visita, fecha)
     if not clave.strip("|"):
         return
@@ -177,7 +177,7 @@ def _buscar_marcador_espn(liga: str, local: str, visita: str, fecha: str):
 
 
 def auditar_partidos_completados() -> dict:
-    """Audita los partidos pendientes que ya finalizaron en ESPN y actualiza metricas."""
+    """Audita los partidos pendientes que ya finalizaron en ESPN y actualiza métricas."""
     memoria = _cargar_memoria()
     hubo_cambios = False
 
@@ -262,7 +262,7 @@ def auditar_y_recalibrar() -> dict:
 
 
 def obtener_factores_liga(liga: str = None) -> dict:
-    """Devuelve los factores calibrados por liga (o el de una liga especifica)."""
+    """Devuelve los factores calibrados por liga (o el de una liga específica)."""
     memoria = _cargar_memoria()
     factores = memoria.get("factores_liga", {})
     if liga:

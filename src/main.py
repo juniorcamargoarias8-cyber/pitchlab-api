@@ -127,8 +127,15 @@ def servir_interfaz():
 @app.get("/api/cartelera")
 def listar_cartelera_hoy(background_tasks: BackgroundTasks, fecha: str = None):
     partidos = obtener_cartelera_hoy(cargar_datos_liga, fecha)
+    background_tasks.add_task(auditar_y_recalibrar)
     background_tasks.add_task(_registrar_cartelera_en_segundo_plano, partidos)
     return {"partidos": partidos}
+
+
+@app.get("/api/auditar")
+def disparar_auditoria():
+    """Ejecuta la auditoría de partidos completados y recalibra métricas."""
+    return auditar_y_recalibrar()
 
 
 @app.get("/api/ticket-optimo")
