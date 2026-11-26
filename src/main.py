@@ -75,10 +75,8 @@ def _calcular_prediccion_completa(liga: str, local: str, visita: str, ultimos_n:
 
 
 def _registrar_cartelera_en_segundo_plano(partidos: list):
-    """Registra silenciosamente todos los partidos pendientes del día en memoria."""
+    """Registra en memoria todos los partidos de la cartelera del día."""
     for p in partidos:
-        if p.get("completado"):
-            continue
         try:
             liga = p["liga"]
             local = p["local_csv"]
@@ -88,6 +86,8 @@ def _registrar_cartelera_en_segundo_plano(partidos: list):
             res = _calcular_prediccion_completa(liga, local, visita, ultimos_n=0)
             if res:
                 registrar_prediccion(liga, local, visita, res["esperados"], res["mercados"], fecha)
+            else:
+                registrar_prediccion(liga, local, visita, None, None, fecha)
         except Exception:
             continue
 
