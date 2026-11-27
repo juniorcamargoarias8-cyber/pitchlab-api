@@ -1,8 +1,9 @@
+import glob
 import os
 import time
 import unicodedata
-import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
+import pandas as pd
 from src.config import (
     CACHE_DIR,
     CODIGOS_EUROPA,
@@ -22,6 +23,7 @@ from src.services.espn_client import (
 )
 
 _MEM_CACHE = {}
+TTL_TEMPORADA_ACTUAL_SEG = 14400  # 4 horas para la temporada en curso
 
 COLUMNAS_UTILES = [
     "Date", "Season", "HomeTeam", "AwayTeam", "FTHG", "FTAG",
@@ -91,13 +93,20 @@ def _normalizar_texto(txt: str) -> str:
     return " ".join(s.lower().replace("-", " ").split())
 
 
+def _extraer_columnas_utiles(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.rename(columns={"Home": "HomeTeam", "Away": "AwayTeam", "HG": "FTHG", "AG": "FTAG"})
+    cols_presentes = [c for c in COLUMNAS_UTILES if c in df.columns]
+    return df[cols_presentes].dropna(subset=["HomeTeam", "AwayTeam", "FTHG", "FTAG"]).copy()
+
+
 def _leer_csv_cacheado(url: str, nombre_cache: str, es_historica: bool = False) -> pd.DataFrame:
+    os.makedirs(CACHE_DIR, exist_ok=True)
     ruta_local = os.path.join(CACHE_DIR, nombre_cache)
     ahora = time.time()
 
     usar_cache = False
     if os.path.exists(ruta_local):
-        if es_historica or (ahora - os.path.getmtime(ruta_local)) < 43200:
+        if es_historica or (ahora - os.path.getmtime(ruta_local)) < TTL_TEMPORADA_ACTUAL_SEG:
             usar_cache = True
 
     try:
@@ -106,11 +115,38 @@ def _leer_csv_cacheado(url: str, nombre_cache: str, es_historica: bool = False) 
         else:
             df = pd.read_csv(url, encoding="latin1")
             df.to_csv(ruta_local, index=False, encoding="utf-8")
-        df = df.rename(columns={"Home": "HomeTeam", "Away": "AwayTeam", "HG": "FTHG", "AG": "FTAG"})
-        cols_presentes = [c for c in COLUMNAS_UTILES if c in df.columns]
-        return df[cols_presentes].dropna(subset=["HomeTeam", "AwayTeam", "FTHG", "FTAG"]).copy()
+        return _extraer_columnas_utiles(df)
     except Exception:
+        if os.path.exists(ruta_local):
+            try:
+                df = pd.read_csv(ruta_local, encoding="utf-8")
+                return _extraer_columnas_utiles(df)
+            except Exception:
+                pass
         return pd.DataFrame()
+
+
+def refrescar_cache_temporada_actual(incluir_ml: bool = False) -> int:
+    """Limpia la caché en memoria y los archivos cacheados de la temporada en curso."""
+    _MEM_CACHE.clear()
+    eliminados = 0
+    patrones = [
+        os.path.join(CACHE_DIR, "2026_*.csv"),
+        os.path.join(CACHE_DIR, "eu_2627_*.csv"),
+        os.path.join(CACHE_DIR, "am_multi_*.csv"),
+        os.path.join(CACHE_DIR, "*.json"),
+    ]
+    if incluir_ml:
+        patrones.append(os.path.join(CACHE_DIR, "ml_models", "*.joblib"))
+
+    for patron in patrones:
+        for ruta in glob.glob(patron):
+            try:
+                os.remove(ruta)
+                eliminados += 1
+            except OSError:
+                continue
+    return eliminados
 
 
 def cargar_datos_liga(nombre_liga: str) -> pd.DataFrame:
@@ -126,7 +162,11 @@ def cargar_datos_liga(nombre_liga: str) -> pd.DataFrame:
 
         def _fetch_temp(temp_str):
             url = f"https://www.football-data.co.uk/mmz4281/{temp_str}/{codigo}.csv"
-            df_t = _leer_csv_cacheado(url, f"eu_{temp_str}_{codigo}.csv", es_historica=(temp_str != "2627"))
+            df_t = _leer_csv_cacheado(
+                url,
+                f"eu_{temp_str}_{codigo}.csv",
+                es_historica=(temp_str != "2627"),
+            )
             if not df_t.empty:
                 df_t = df_t.assign(TempKey=temp_str, PesoBase=PESOS_TEMPORADA_EUROPA[temp_str])
             return df_t
@@ -276,7 +316,7 @@ def obtener_perfil_completo_equipo(df: pd.DataFrame, equipo: str, es_local_hoy: 
     equipo_busqueda = equipo
     todos = df_trabajo[(df_trabajo["HomeTeam"] == equipo_busqueda) | (df_trabajo["AwayTeam"] == equipo_busqueda)]
 
-    # 1. En torneos internacionales, priorizar historial completo del club en su liga doméstica (40+ partidos con tiros/córners)
+    # 1. En torneos internacionales, priorizar historial completo del club en su liga doméstica
     if nombre_liga in ESPN_TORNEOS_INTERNACIONALES and len(todos) < 6:
         df_dom, nombre_csv = _buscar_club_en_ligas_domesticas(equipo)
         if df_dom is not None and nombre_csv:
@@ -292,7 +332,7 @@ def obtener_perfil_completo_equipo(df: pd.DataFrame, equipo: str, es_local_hoy: 
             equipo_busqueda = equipo
             todos = df_trabajo
 
-    # 3. Respaldo realista para clubes de rondas previas sin historial en CSV ni ESPN (ej. Sabah FK)
+    # 3. Respaldo para clubes de rondas previas sin historial en CSV ni ESPN
     if todos.empty and nombre_liga in ESPN_TORNEOS_INTERNACIONALES:
         base_previa = {
             "pj": 0,
@@ -379,11 +419,6 @@ def _canon_equipo_h2h(nombre: str) -> str:
     return ALIAS_EQUIPOS.get(n, n)
 
 
-def _canon_equipo_h2h(nombre: str) -> str:
-    n = _normalizar_texto(nombre)
-    return ALIAS_EQUIPOS.get(n, n)
-
-
 def obtener_historial_h2h(
     df: pd.DataFrame,
     equipo_local: str,
@@ -447,6 +482,8 @@ def obtener_historial_h2h(
     df_h2h = df_h2h.drop_duplicates(
         subset=[c for c in ["Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG"] if c in df_h2h.columns]
     )
+    if "_fecha_ord" in df_h2h.columns:
+        df_h2h = df_h2h.drop(columns=["_fecha_ord"])
 
     df_recientes = df_h2h.tail(limite).iloc[::-1]
 
@@ -465,9 +502,13 @@ def obtener_historial_h2h(
         except (ValueError, TypeError):
             continue
 
-        h_team = str(row["HomeTeam"])
-        a_team = str(row["AwayTeam"])
-        fecha = str(row.get("Date", row.get("TempKey", "")))
+        h_team = str(row["HomeTeam"]).strip()
+        a_team = str(row["AwayTeam"]).strip()
+        fecha_raw = row.get("Date")
+        if pd.notna(fecha_raw) and str(fecha_raw).strip():
+            fecha = str(fecha_raw).strip()
+        else:
+            fecha = str(row.get("TempKey", "")).strip()
 
         total_goles += (hg + ag)
         if _canon_equipo_h2h(h_team) == canon_l:
@@ -526,6 +567,7 @@ def obtener_historial_h2h(
         "pct_btts": round((btts_cnt / n) * 100, 1),
         "partidos": lista_partidos,
     }
+
 
 def obtener_contexto_clasificacion(df: pd.DataFrame, equipo_local: str, equipo_visita: str) -> dict:
     if df.empty or "TempKey" not in df.columns:

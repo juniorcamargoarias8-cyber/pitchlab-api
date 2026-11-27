@@ -1,7 +1,8 @@
+import os
 import threading
-from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Header
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from src.config import LIGAS_DISPONIBLES, REGION_LIGA
@@ -10,6 +11,7 @@ from src.services.data_loader import (
     obtener_perfil_completo_equipo,
     obtener_historial_h2h,
     obtener_contexto_clasificacion,
+    refrescar_cache_temporada_actual,
 )
 from src.services.espn_client import obtener_cartelera_hoy
 from src.services.learning_engine import (
@@ -124,6 +126,20 @@ def servir_interfaz():
         return f.read()
 
 
+@app.post("/api/refrescar-cache")
+def refrescar_cache(incluir_ml: bool = False, x_api_key: str = Header(default="")):
+    clave_esperada = os.getenv("ADMIN_KEY", "pitchlab2026")
+    if x_api_key != clave_esperada:
+        raise HTTPException(status_code=401, detail="Clave inválida")
+
+    eliminados = refrescar_cache_temporada_actual(incluir_ml=incluir_ml)
+    return {
+        "status": "ok",
+        "archivos_eliminados": eliminados,
+        "ml_reentrenara_si_borrado": incluir_ml,
+    }
+
+
 @app.get("/api/cartelera")
 def listar_cartelera_hoy(background_tasks: BackgroundTasks, fecha: str = None):
     partidos = obtener_cartelera_hoy(cargar_datos_liga, fecha)
@@ -198,7 +214,6 @@ def generar_ticket_optimo(fecha: str = None):
                 else "goles" if ("gol" in nom or "btts" in nom)
                 else "resultado"
             )
-            # Evitar que un ticket de 3-4 selecciones dependa solo de córners
             if conteo_cat[cat] >= 2:
                 continue
             conteo_cat[cat] += 1
