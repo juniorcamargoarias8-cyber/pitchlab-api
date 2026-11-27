@@ -11,6 +11,8 @@ from src.config import (
     PESOS_TEMPORADA_EUROPA,
     PESOS_TEMPORADA_AMERICA,
     ESPN_SLUGS_AMERICA,
+    LIGAS_HERMANAS,
+    ALIAS_EQUIPOS,
 )
 from src.services.espn_client import (
     obtener_info_espn_equipo,
@@ -372,32 +374,55 @@ def obtener_perfil_completo_equipo(df: pd.DataFrame, equipo: str, es_local_hoy: 
     }
 
 
-def obtener_historial_h2h(df: pd.DataFrame, equipo_local: str, equipo_visita: str, limite: int = 8) -> dict:
+def _canon_equipo_h2h(nombre: str) -> str:
+    n = _normalizar_texto(nombre)
+    return ALIAS_EQUIPOS.get(n, n)
+
+
+def obtener_historial_h2h(
+    df: pd.DataFrame,
+    equipo_local: str,
+    equipo_visita: str,
+    limite: int = 8,
+    liga: str = "",
+    cargar_liga_fn=None,
+) -> dict:
+    canon_l = _canon_equipo_h2h(equipo_local)
+    canon_v = _canon_equipo_h2h(equipo_visita)
+
     def _filtrar_duelos(dataframe):
-        if dataframe.empty:
-            return dataframe
-        cond = (
-            ((dataframe["HomeTeam"] == equipo_local) & (dataframe["AwayTeam"] == equipo_visita)) |
-            ((dataframe["HomeTeam"] == equipo_visita) & (dataframe["AwayTeam"] == equipo_local))
+        if dataframe is None or dataframe.empty:
+            return pd.DataFrame()
+        h_canon = dataframe["HomeTeam"].astype(str).map(_canon_equipo_h2h)
+        a_canon = dataframe["AwayTeam"].astype(str).map(_canon_equipo_h2h)
+        cond = ((h_canon == canon_l) & (a_canon == canon_v)) | (
+            (h_canon == canon_v) & (a_canon == canon_l)
         )
         return dataframe[cond].copy()
 
-    df_h2h = _filtrar_duelos(df)
+    lotes = [_filtrar_duelos(df)]
+    nombre_liga = liga or (df.attrs.get("nombre_liga", "") if df is not None else "")
 
-    nombre_liga = df.attrs.get("nombre_liga", "")
-    if df_h2h.empty and nombre_liga in CODIGOS_EUROPA:
+    if nombre_liga in CODIGOS_EUROPA:
         codigo = CODIGOS_EUROPA[nombre_liga]
-        frames_extra = []
         for temp_ant in ["2223", "2122", "2021", "1920", "1819"]:
             url = f"https://www.football-data.co.uk/mmz4281/{temp_ant}/{codigo}.csv"
             df_t = _leer_csv_cacheado(url, f"eu_{temp_ant}_{codigo}.csv", es_historica=True)
             if not df_t.empty:
                 df_t = df_t.assign(TempKey=temp_ant)
-                frames_extra.append(_filtrar_duelos(df_t))
-        if frames_extra:
-            df_h2h = pd.concat(frames_extra, ignore_index=True)
+                lotes.append(_filtrar_duelos(df_t))
 
-    if df_h2h.empty:
+    if callable(cargar_liga_fn) and nombre_liga in LIGAS_HERMANAS:
+        for liga_hermana in LIGAS_HERMANAS[nombre_liga]:
+            try:
+                df_h = cargar_liga_fn(liga_hermana)
+                if df_h is not None and not df_h.empty:
+                    lotes.append(_filtrar_duelos(df_h))
+            except Exception:
+                continue
+
+    lotes_validos = [d for d in lotes if not d.empty]
+    if not lotes_validos:
         return {
             "total": 0,
             "victorias_local": 0,
@@ -407,8 +432,16 @@ def obtener_historial_h2h(df: pd.DataFrame, equipo_local: str, equipo_visita: st
             "prom_goles_equipo_local": 0.0,
             "prom_goles_equipo_visita": 0.0,
             "pct_btts": 0.0,
-            "partidos": []
+            "partidos": [],
         }
+
+    df_h2h = pd.concat(lotes_validos, ignore_index=True)
+    if "Date" in df_h2h.columns:
+        df_h2h["_fecha_ord"] = pd.to_datetime(df_h2h["Date"], errors="coerce", dayfirst=True)
+        df_h2h = df_h2h.sort_values("_fecha_ord", ascending=True)
+    df_h2h = df_h2h.drop_duplicates(
+        subset=[c for c in ["Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG"] if c in df_h2h.columns]
+    )
 
     df_recientes = df_h2h.tail(limite).iloc[::-1]
 
@@ -424,12 +457,14 @@ def obtener_historial_h2h(df: pd.DataFrame, equipo_local: str, equipo_visita: st
         fecha = str(row.get("Date", row.get("TempKey", "")))
 
         total_goles += (hg + ag)
-        if h_team == equipo_local:
+        if _canon_equipo_h2h(h_team) == canon_l:
             goles_eq_local += hg
             goles_eq_visita += ag
+            local_es_h = True
         else:
             goles_eq_local += ag
             goles_eq_visita += hg
+            local_es_h = False
 
         if hg > 0 and ag > 0:
             btts_cnt += 1
@@ -437,7 +472,7 @@ def obtener_historial_h2h(df: pd.DataFrame, equipo_local: str, equipo_visita: st
         if hg == ag:
             emp += 1
             ganador = "Empate"
-        elif (hg > ag and h_team == equipo_local) or (ag > hg and a_team == equipo_local):
+        elif (hg > ag and local_es_h) or (ag > hg and not local_es_h):
             vic_l += 1
             ganador = equipo_local
         else:
@@ -450,7 +485,7 @@ def obtener_historial_h2h(df: pd.DataFrame, equipo_local: str, equipo_visita: st
             "visita": a_team,
             "goles_local": hg,
             "goles_visita": ag,
-            "ganador": ganador
+            "ganador": ganador,
         })
 
     n = len(lista_partidos)
@@ -463,7 +498,7 @@ def obtener_historial_h2h(df: pd.DataFrame, equipo_local: str, equipo_visita: st
         "prom_goles_equipo_local": round(goles_eq_local / n, 2),
         "prom_goles_equipo_visita": round(goles_eq_visita / n, 2),
         "pct_btts": round((btts_cnt / n) * 100, 1),
-        "partidos": lista_partidos
+        "partidos": lista_partidos,
     }
 
 

@@ -33,7 +33,7 @@ def _calcular_prediccion_completa(liga: str, local: str, visita: str, ultimos_n:
     if not stats_l or not stats_v:
         return None
 
-    historial_h2h = obtener_historial_h2h(df, local, visita)
+    historial_h2h = obtener_historial_h2h(df, local, visita, liga=liga, cargar_liga_fn=cargar_datos_liga)
     contexto_tabla = obtener_contexto_clasificacion(df, local, visita)
     factores_liga = obtener_factores_liga(liga)
 

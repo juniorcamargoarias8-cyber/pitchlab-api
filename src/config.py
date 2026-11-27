@@ -36,6 +36,19 @@ CODIGOS_EUROPA = {
     "Ligue 2 (Francia 2ª)": "F2",
 }
 
+LIGAS_HERMANAS = {
+    "LaLiga (España)": ["LaLiga Hypermotion (España 2ª)"],
+    "LaLiga Hypermotion (España 2ª)": ["LaLiga (España)"],
+    "Premier League (Inglaterra)": ["Championship (Inglaterra 2ª)"],
+    "Championship (Inglaterra 2ª)": ["Premier League (Inglaterra)"],
+    "Serie A (Italia)": ["Serie B (Italia 2ª)"],
+    "Serie B (Italia 2ª)": ["Serie A (Italia)"],
+    "Bundesliga (Alemania)": ["2. Bundesliga (Alemania 2ª)"],
+    "2. Bundesliga (Alemania 2ª)": ["Bundesliga (Alemania)"],
+    "Ligue 1 (Francia)": ["Ligue 2 (Francia 2ª)"],
+    "Ligue 2 (Francia 2ª)": ["Ligue 1 (Francia)"],
+}
+
 URLS_AMERICA = {
     "Liga Profesional (Argentina)": "https://www.football-data.co.uk/new/ARG.csv",
     "Brasileirão Serie A (Brasil)": "https://www.football-data.co.uk/new/BRA.csv",
@@ -122,4 +135,8 @@ ALIAS_EQUIPOS = {
     "bayern": "bayern munich",
     "atletico": "atletico madrid",
     "sporting cp": "sporting lisbon",
+    "racing santander": "racing santander",
+    "r racing club": "racing santander",
+    "racing club": "racing santander",
+    "levante ud": "levante",
 }
