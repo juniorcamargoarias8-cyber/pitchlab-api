@@ -75,7 +75,7 @@ def _enriquecer_mercados(
             perfil = "CUOTA_BAJA"
         elif 1.35 <= cuota_minima_ev <= 1.85 and prob >= 65.0 and not alerta_item:
             perfil = "DOBLE_RENTABLE"
-        elif cuota_minima_ev > 1.85 and prob >= 55.0 and not alerta_item:
+        elif cuota_minima_ev > 1.85 and prob >= 53.0 and not alerta_item:
             perfil = "SIMPLE_VALOR"
         else:
             perfil = "ESTANDAR"

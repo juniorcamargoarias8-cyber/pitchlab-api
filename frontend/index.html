@@ -579,7 +579,7 @@
             padding: 10px 14px;
             border-radius: 8px;
             background: rgba(245, 158, 11, 0.12);
-            border: 1px solid rgba(245, 158, 11, 0.3);
+            border: 1px solid rgba(245, 158, 11, 0.35);
             color: #fbbf24;
             font-size: 0.82rem;
             font-weight: 600;
@@ -645,10 +645,69 @@
         .prob-head {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             gap: 10px;
             font-size: 0.84rem;
             margin-bottom: 5px;
+        }
+
+        .prob-title-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .prob-meta-ev {
+            font-size: 0.74rem;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .prob-meta-ev strong {
+            color: #e2e8f0;
+        }
+
+        .prob-alerta-inline {
+            font-size: 0.74rem;
+            color: #fca5a5;
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 5px 9px;
+            border-radius: 7px;
+            margin-bottom: 6px;
+        }
+
+        .perfil-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 1px 7px;
+            border-radius: 5px;
+            white-space: nowrap;
+        }
+
+        .perfil-doble {
+            background: rgba(16, 185, 129, 0.18);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }
+
+        .perfil-simple {
+            background: rgba(59, 130, 246, 0.18);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.35);
+        }
+
+        .perfil-baja {
+            background: rgba(148, 163, 184, 0.14);
+            color: var(--text-secondary);
+        }
+
+        .perfil-alerta {
+            background: rgba(239, 68, 68, 0.18);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.35);
         }
 
         .prob-pct {
@@ -942,10 +1001,12 @@
                 </div>
                 <div class="context-lines" id="contextLines"></div>
                 <div class="context-alert" id="contextAlert" style="display:none;"></div>
+                <div class="context-alert" id="contextVisitaAlert" style="display:none;"></div>
             </div>
 
             <div class="cat-bar">
                 <button class="cat-chip active" onclick="filtrarCategoria('todos', this)">Todos los Mercados</button>
+                <button class="cat-chip" onclick="filtrarCategoria('valor', this)">💎 Valor EV+ (Dobles y Simples)</button>
                 <button class="cat-chip" onclick="filtrarCategoria('betano', this)">✅ Óptimo Betano (68–85%)</button>
                 <button class="cat-chip" onclick="filtrarCategoria('resultado', this)">1X2 y Doble Oportunidad</button>
                 <button class="cat-chip" onclick="filtrarCategoria('goles', this)">Goles y BTTS</button>
@@ -1082,6 +1143,7 @@
             };
 
             body.innerHTML =
+                renderTicket('⚡ Doble Rentable (2 Selecciones)', data.ticket_seguro_2) +
                 renderTicket('🛡️ Ticket Conservador (3 Selecciones)', data.ticket_seguro_3) +
                 renderTicket('⚖️ Ticket Equilibrado (4 Selecciones)', data.ticket_equilibrado_4);
         } catch (e) {
@@ -1330,6 +1392,14 @@
             alertBox.style.display = 'none';
         }
 
+        const visitaAlertBox = document.getElementById('contextVisitaAlert');
+        if (cl.alerta_riesgo_visita) {
+            visitaAlertBox.textContent = `⚠️ ${cl.alerta_riesgo_visita}`;
+            visitaAlertBox.style.display = 'block';
+        } else {
+            visitaAlertBox.style.display = 'none';
+        }
+
         renderizarBarrasPoisson();
 
         document.getElementById('compTable').innerHTML = `
@@ -1379,10 +1449,29 @@
         }
     }
 
+    function obtenerBadgePerfil(m) {
+        if (m.alerta) {
+            return `<span class="perfil-badge perfil-alerta">⚠️ Riesgo 0-0</span>`;
+        }
+        switch (m.perfil_ticket) {
+            case 'DOBLE_RENTABLE':
+                return `<span class="perfil-badge perfil-doble">✓ Doble Rentable</span>`;
+            case 'SIMPLE_VALOR':
+                return `<span class="perfil-badge perfil-simple">★ Simple Valor</span>`;
+            case 'CUOTA_BAJA':
+                return `<span class="perfil-badge perfil-baja">Cuota Baja</span>`;
+            default:
+                return '';
+        }
+    }
+
     function renderizarBarrasPoisson() {
         const mercados = Array.isArray(prediccionData?.mercados) ? prediccionData.mercados : [];
         const filtrados = mercados.filter(m => {
             const nom = String(m.mercado || '').toLowerCase();
+            if (catActual === 'valor') {
+                return !m.alerta && (m.perfil_ticket === 'DOBLE_RENTABLE' || m.perfil_ticket === 'SIMPLE_VALOR');
+            }
             if (catActual === 'betano') return m.probabilidad >= 68.0 && m.probabilidad <= 85.5;
             if (catActual === 'resultado') return nom.includes('gana') || nom.includes('empate');
             if (catActual === 'goles') return nom.includes('gol') || nom.includes('btts');
@@ -1400,23 +1489,35 @@
         document.getElementById('poissonBarsContainer').innerHTML = filtrados.map(m => {
             const prob = Number(m.probabilidad) || 0;
             let color = 'var(--text-secondary)';
-            let tag = '';
-            if (prob > 85.5) {
+            if (m.alerta) {
+                color = 'var(--red)';
+            } else if (m.perfil_ticket === 'DOBLE_RENTABLE' || (prob >= 68.0 && prob <= 85.5)) {
                 color = 'var(--emerald)';
-                tag = `<span style="font-size:0.7rem; padding:1px 7px; border-radius:5px; background:rgba(148,163,184,0.14); color:var(--text-secondary); margin-left:6px;">Cuota baja</span>`;
-            } else if (prob >= 68.0) {
-                color = 'var(--emerald)';
-                tag = `<span style="font-size:0.7rem; padding:1px 7px; border-radius:5px; background:var(--emerald-glow); color:var(--emerald); margin-left:6px;">✅ Rango Betano</span>`;
+            } else if (m.perfil_ticket === 'SIMPLE_VALOR') {
+                color = 'var(--blue)';
             } else if (prob >= 55.0) {
                 color = 'var(--amber)';
             }
 
+            const badgeHtml = obtenerBadgePerfil(m);
+            const evHtml = (m.cuota_minima_ev !== undefined && m.cuota_minima_ev !== null)
+                ? `<div class="prob-meta-ev">Cuota justa: <strong>${escaparHtml(m.cuota_justa ?? '-')}</strong> • Cuota mín. EV+: <strong>${escaparHtml(m.cuota_minima_ev)}</strong></div>`
+                : '';
+            const alertaHtml = m.alerta
+                ? `<div class="prob-alerta-inline">${escaparHtml(m.alerta)}</div>`
+                : '';
+
             return `
                 <div class="prob-row">
                     <div class="prob-head">
-                        <span>${escaparHtml(m.mercado)}${tag}</span>
+                        <div class="prob-title-wrap">
+                            <span>${escaparHtml(m.mercado)}</span>
+                            ${badgeHtml}
+                        </div>
                         <span class="prob-pct" style="color:${color};">${prob.toFixed(1)}%</span>
                     </div>
+                    ${evHtml}
+                    ${alertaHtml}
                     <div class="prob-track">
                         <div class="prob-fill" style="width:${Math.max(0, Math.min(100, prob))}%; background:${color};"></div>
                     </div>
@@ -1448,7 +1549,7 @@
                         `<span style="display:inline-block; margin:2px 4px 2px 0; padding:2px 6px; border-radius:4px; font-size:0.74rem; background:${a.acertado ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color:${a.acertado ? '#34d399' : '#f87171'};">${a.acertado ? '✓' : '✗'} ${escaparHtml(a.mercado || '')}</span>`
                     ).join('');
                 } else if (typeof u.acierto === 'boolean') {
-                    pillsHtml = `<span style="display:inline-block; margin:2px 4px 2px 0; padding:2px 6px; border-radius:4px; font-size:0.74rem; background:${u.acierto ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color:${u.acierto ? '#34d399' : '#f87171'};">${u.acertado ? '✓ Acierto top mercado' : '✗ Fallo top mercado'}</span>`;
+                    pillsHtml = `<span style="display:inline-block; margin:2px 4px 2px 0; padding:2px 6px; border-radius:4px; font-size:0.74rem; background:${u.acierto ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color:${u.acierto ? '#34d399' : '#f87171'};">${u.acierto ? '✓ Acierto top mercado' : '✗ Fallo top mercado'}</span>`;
                 }
 
                 return `<div style="padding:6px 0; border-top:1px solid rgba(255,255,255,0.06);">
