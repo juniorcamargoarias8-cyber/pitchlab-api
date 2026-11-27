@@ -379,6 +379,11 @@ def _canon_equipo_h2h(nombre: str) -> str:
     return ALIAS_EQUIPOS.get(n, n)
 
 
+def _canon_equipo_h2h(nombre: str) -> str:
+    n = _normalizar_texto(nombre)
+    return ALIAS_EQUIPOS.get(n, n)
+
+
 def obtener_historial_h2h(
     df: pd.DataFrame,
     equipo_local: str,
@@ -450,10 +455,18 @@ def obtener_historial_h2h(
     lista_partidos = []
 
     for _, row in df_recientes.iterrows():
+        raw_hg = row.get("FTHG")
+        raw_ag = row.get("FTAG")
+        if pd.isna(raw_hg) or pd.isna(raw_ag):
+            continue
+        try:
+            hg = int(float(raw_hg))
+            ag = int(float(raw_ag))
+        except (ValueError, TypeError):
+            continue
+
         h_team = str(row["HomeTeam"])
         a_team = str(row["AwayTeam"])
-        hg = int(float(row["FTHG"]))
-        ag = int(float(row["FTAG"]))
         fecha = str(row.get("Date", row.get("TempKey", "")))
 
         total_goles += (hg + ag)
@@ -489,6 +502,19 @@ def obtener_historial_h2h(
         })
 
     n = len(lista_partidos)
+    if n == 0:
+        return {
+            "total": 0,
+            "victorias_local": 0,
+            "empates": 0,
+            "victorias_visita": 0,
+            "prom_goles": 0.0,
+            "prom_goles_equipo_local": 0.0,
+            "prom_goles_equipo_visita": 0.0,
+            "pct_btts": 0.0,
+            "partidos": [],
+        }
+
     return {
         "total": n,
         "victorias_local": vic_l,
@@ -500,7 +526,6 @@ def obtener_historial_h2h(
         "pct_btts": round((btts_cnt / n) * 100, 1),
         "partidos": lista_partidos,
     }
-
 
 def obtener_contexto_clasificacion(df: pd.DataFrame, equipo_local: str, equipo_visita: str) -> dict:
     if df.empty or "TempKey" not in df.columns:
