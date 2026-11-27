@@ -843,6 +843,21 @@
     let ventanaActual = 0;
     let catActual = 'todos';
     let prediccionData = null;
+    const partidosCartelera = [];
+
+    function urlSegura(url) {
+        if (!url) return '';
+        return String(url).trim().replace(/^http:\/\//i, 'https://');
+    }
+
+    function escaparHtml(txt) {
+        return String(txt || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
 
     function formatearFechaAPI(dateObj) {
         const y = dateObj.getFullYear();
@@ -888,21 +903,21 @@
         body.innerHTML = `<div class="loader" style="grid-column:1/-1;">Analizando partidos pendientes y cruzando probabilidades óptimas Betano...</div>`;
 
         try {
-            const res = await fetch(`/api/ticket-optimo?fecha=${fechaSeleccionada}`);
+            const res = await fetch(`/api/ticket-optimo?fecha=${encodeURIComponent(fechaSeleccionada)}`);
             const data = await res.json();
 
             const renderTicket = (titulo, combo) => {
-                if (!combo || !combo.selecciones || combo.selecciones.length === 0) {
+                if (!combo || !Array.isArray(combo.selecciones) || combo.selecciones.length === 0) {
                     return `<div class="ticket-box"><p style="color:var(--text-secondary); font-size:0.85rem;">No hay suficientes partidos pendientes con valor óptimo en esta fecha.</p></div>`;
                 }
                 const legsHtml = combo.selecciones.map(s => `
                     <div class="ticket-leg">
                         <div class="ticket-leg-top">
-                            <span>${s.partido} • ${s.liga}</span>
-                            <span>Prev: ${s.marcador_previsto}</span>
+                            <span>${escaparHtml(s.partido)} • ${escaparHtml(s.liga)}</span>
+                            <span>Prev: ${escaparHtml(s.marcador_previsto)}</span>
                         </div>
                         <div class="ticket-leg-pick">
-                            <span style="color:var(--emerald);">✓ ${s.mercado}</span>
+                            <span style="color:var(--emerald);">✓ ${escaparHtml(s.mercado)}</span>
                             <span>${s.probabilidad}% <span style="color:var(--text-secondary); font-weight:500;">(~${s.cuota_estimada})</span></span>
                         </div>
                     </div>
@@ -911,7 +926,7 @@
                 return `
                     <div class="ticket-box">
                         <div class="ticket-box-head">
-                            <span style="font-weight:800; font-size:0.92rem;">${titulo}</span>
+                            <span style="font-weight:800; font-size:0.92rem;">${escaparHtml(titulo)}</span>
                             <span class="ticket-badge">Cuota Est: ${combo.cuota_combinada_est}x • Prob: ${combo.probabilidad_conjunta}%</span>
                         </div>
                         ${legsHtml}
@@ -927,13 +942,21 @@
         }
     }
 
+    function abrirPartidoPorIndice(idx) {
+        const info = partidosCartelera[idx];
+        if (!info) return;
+        abrirPartido(info);
+    }
+
     async function cargarCartelera(fStr) {
         const cont = document.getElementById('carteleraContainer');
         cont.innerHTML = `<div class="loader">Buscando partidos oficiales...</div>`;
+        partidosCartelera.length = 0;
+
         try {
-            const res = await fetch(`/api/cartelera?fecha=${fStr}`);
+            const res = await fetch(`/api/cartelera?fecha=${encodeURIComponent(fStr)}`);
             const data = await res.json();
-            const partidos = data.partidos || [];
+            const partidos = Array.isArray(data.partidos) ? data.partidos : [];
 
             if (partidos.length === 0) {
                 cont.innerHTML = `<div class="loader">No hay partidos programados en las ligas monitoreadas para esta fecha.</div>`;
@@ -942,37 +965,39 @@
 
             const porLiga = {};
             partidos.forEach(p => {
-                if (!porLiga[p.liga]) porLiga[p.liga] = { logo: p.liga_logo, items: [] };
-                porLiga[p.liga].items.push(p);
+                const nombreLiga = p.liga || 'Competición';
+                if (!porLiga[nombreLiga]) porLiga[nombreLiga] = { logo: urlSegura(p.liga_logo), items: [] };
+                const idx = partidosCartelera.push({
+                    liga: nombreLiga,
+                    local: p.local_csv || p.local_display || '',
+                    visita: p.visita_csv || p.visita_display || '',
+                    hora: p.hora_utc
+                        ? new Date(p.hora_utc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : (p.estado || 'VS'),
+                    logoL: urlSegura(p.local_logo),
+                    logoV: urlSegura(p.visita_logo),
+                    fecha: p.hora_utc ? String(p.hora_utc).slice(0, 10) : ''
+                }) - 1;
+                porLiga[nombreLiga].items.push({ raw: p, idx });
             });
 
             cont.innerHTML = Object.entries(porLiga).map(([liga, grupo]) => {
-                const cards = grupo.items.map(p => {
-                    const horaLocal = p.hora_utc
-                        ? new Date(p.hora_utc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : p.estado;
+                const cards = grupo.items.map(({ raw: p, idx }) => {
+                    const info = partidosCartelera[idx];
                     return `
-                        <div class="match-card" onclick='abrirPartido(${JSON.stringify({
-                            liga: p.liga,
-                            local: p.local_csv,
-                            visita: p.visita_csv,
-                            hora: horaLocal,
-                            logoL: p.local_logo,
-                            logoV: p.visita_logo,
-                            fecha: p.hora_utc ? p.hora_utc.slice(0, 10) : ""
-                        })})'>
+                        <div class="match-card" onclick="abrirPartidoPorIndice(${idx})">
                             <div class="match-meta">
-                                <span>${horaLocal}</span>
-                                <span>${p.estado}</span>
+                                <span>${escaparHtml(info.hora)}</span>
+                                <span>${escaparHtml(p.estado || '')}</span>
                             </div>
                             <div class="match-teams">
                                 <div class="team-row">
-                                    <img src="${p.local_logo}" alt="" onerror="this.style.display='none'">
-                                    <span>${p.local_display}</span>
+                                    ${info.logoL ? `<img src="${escaparHtml(info.logoL)}" alt="" onerror="this.style.display='none'">` : ''}
+                                    <span>${escaparHtml(p.local_display || p.local_csv || '')}</span>
                                 </div>
                                 <div class="team-row">
-                                    <img src="${p.visita_logo}" alt="" onerror="this.style.display='none'">
-                                    <span>${p.visita_display}</span>
+                                    ${info.logoV ? `<img src="${escaparHtml(info.logoV)}" alt="" onerror="this.style.display='none'">` : ''}
+                                    <span>${escaparHtml(p.visita_display || p.visita_csv || '')}</span>
                                 </div>
                             </div>
                         </div>
@@ -982,8 +1007,8 @@
                 return `
                     <div class="league-group">
                         <div class="league-header">
-                            ${grupo.logo ? `<img src="${grupo.logo}" alt="">` : ''}
-                            <h2>${liga}</h2>
+                            ${grupo.logo ? `<img src="${escaparHtml(grupo.logo)}" alt="" onerror="this.style.display='none'">` : ''}
+                            <h2>${escaparHtml(liga)}</h2>
                         </div>
                         <div class="matches-grid">${cards}</div>
                     </div>
@@ -999,7 +1024,9 @@
             const res = await fetch('/api/ligas');
             const data = await res.json();
             const sel = document.getElementById('selLiga');
-            sel.innerHTML = (data.ligas || []).map(l => `<option value="${l.nombre}">${l.nombre}</option>`).join('');
+            sel.innerHTML = (Array.isArray(data.ligas) ? data.ligas : [])
+                .map(l => `<option value="${escaparHtml(l.nombre)}">${escaparHtml(l.nombre)}</option>`)
+                .join('');
             await cargarEquiposLiga();
         } catch (e) {
             console.error('Error cargando ligas:', e);
@@ -1018,7 +1045,7 @@
         try {
             const res = await fetch(`/api/equipos?liga=${encodeURIComponent(liga)}`);
             const data = await res.json();
-            const lista = data.equipos || [];
+            const lista = Array.isArray(data.equipos) ? data.equipos : [];
 
             if (lista.length === 0) {
                 selL.innerHTML = `<option value="">Sin equipos</option>`;
@@ -1026,7 +1053,7 @@
                 return;
             }
 
-            const opts = lista.map(eq => `<option value="${eq}">${eq}</option>`).join('');
+            const opts = lista.map(eq => `<option value="${escaparHtml(eq)}">${escaparHtml(eq)}</option>`).join('');
             selL.innerHTML = opts;
             selV.innerHTML = opts;
             if (lista.length > 1) {
@@ -1073,17 +1100,19 @@
         document.getElementById('homeView').style.display = 'none';
         document.getElementById('analysisView').style.display = 'block';
 
-        document.getElementById('heroNameL').textContent = info.local;
-        document.getElementById('heroNameV').textContent = info.visita;
+        document.getElementById('heroNameL').textContent = info.local || 'Local';
+        document.getElementById('heroNameV').textContent = info.visita || 'Visitante';
         document.getElementById('heroTime').textContent = info.hora || 'VS';
-        document.getElementById('heroLiga').textContent = info.liga;
+        document.getElementById('heroLiga').textContent = info.liga || '';
 
         const imgL = document.getElementById('heroLogoL');
         const imgV = document.getElementById('heroLogoV');
-        imgL.src = info.logoL || '';
-        imgL.style.display = info.logoL ? 'block' : 'none';
-        imgV.src = info.logoV || '';
-        imgV.style.display = info.logoV ? 'block' : 'none';
+        const srcL = urlSegura(info.logoL);
+        const srcV = urlSegura(info.logoV);
+        imgL.src = srcL;
+        imgL.style.display = srcL ? 'block' : 'none';
+        imgV.src = srcV;
+        imgV.style.display = srcV ? 'block' : 'none';
 
         ejecutarPrediccion();
     }
@@ -1104,47 +1133,46 @@
     }
 
     function renderizarAnalisis() {
-        const d = prediccionData;
-        const sl = d.stats_local;
-        const sv = d.stats_visita;
-        const esp = d.esperados;
+        const d = prediccionData || {};
+        const sl = d.stats_local || {};
+        const sv = d.stats_visita || {};
+        const esp = d.esperados || {};
 
         if (sl.logo) {
             const imgL = document.getElementById('heroLogoL');
-            imgL.src = sl.logo;
+            imgL.src = urlSegura(sl.logo);
             imgL.style.display = 'block';
         }
         if (sv.logo) {
             const imgV = document.getElementById('heroLogoV');
-            imgV.src = sv.logo;
+            imgV.src = urlSegura(sv.logo);
             imgV.style.display = 'block';
         }
 
-        document.getElementById('rachaL').innerHTML = (sl.racha || []).map(r => `<span class="dot dot-${r}">${r}</span>`).join('');
-        document.getElementById('rachaV').innerHTML = (sv.racha || []).map(r => `<span class="dot dot-${r}">${r}</span>`).join('');
+        document.getElementById('rachaL').innerHTML = (Array.isArray(sl.racha) ? sl.racha : []).map(r => `<span class="dot dot-${escaparHtml(r)}">${escaparHtml(r)}</span>`).join('');
+        document.getElementById('rachaV').innerHTML = (Array.isArray(sv.racha) ? sv.racha : []).map(r => `<span class="dot dot-${escaparHtml(r)}">${escaparHtml(r)}</span>`).join('');
 
         let xgHtml = `
-            <div class="xg-item"><div class="xg-label">xG Local</div><div class="xg-val">${esp.goles_local}</div></div>
-            <div class="xg-item"><div class="xg-label">xG Visita</div><div class="xg-val">${esp.goles_visita}</div></div>
-            <div class="xg-item"><div class="xg-label">Goles Totales</div><div class="xg-val">${esp.goles_total}</div></div>
+            <div class="xg-item"><div class="xg-label">xG Local</div><div class="xg-val">${esp.goles_local ?? '-'}</div></div>
+            <div class="xg-item"><div class="xg-label">xG Visita</div><div class="xg-val">${esp.goles_visita ?? '-'}</div></div>
+            <div class="xg-item"><div class="xg-label">Goles Totales</div><div class="xg-val">${esp.goles_total ?? '-'}</div></div>
         `;
         if (esp.tiene_stats_avanzadas) {
             xgHtml += `
-                <div class="xg-item"><div class="xg-label">Córners (L / V)</div><div class="xg-val">${esp.corners_local} / ${esp.corners_visita}</div></div>
-                <div class="xg-item"><div class="xg-label">Tiros Arco (L / V)</div><div class="xg-val">${esp.tiros_local} / ${esp.tiros_visita}</div></div>
-                <div class="xg-item"><div class="xg-label">Tarjetas Esp.</div><div class="xg-val">${esp.tarjetas_total}</div></div>
+                <div class="xg-item"><div class="xg-label">Córners (L / V)</div><div class="xg-val">${esp.corners_local ?? '-'} / ${esp.corners_visita ?? '-'}</div></div>
+                <div class="xg-item"><div class="xg-label">Tiros Arco (L / V)</div><div class="xg-val">${esp.tiros_local ?? '-'} / ${esp.tiros_visita ?? '-'}</div></div>
+                <div class="xg-item"><div class="xg-label">Tarjetas Esp.</div><div class="xg-val">${esp.tarjetas_total ?? '-'}</div></div>
             `;
         }
         document.getElementById('xgGrid').innerHTML = xgHtml;
 
-        // Contexto
-        document.getElementById('badgeMarcador').textContent = `Marcador Previsto: ${esp.marcador_probable} (Alt: ${esp.marcador_alternativo})`;
+        document.getElementById('badgeMarcador').textContent = `Marcador Previsto: ${esp.marcador_probable || '-'} (Alt: ${esp.marcador_alternativo || '-'})`;
         const cl = d.contexto_deportivo || d.claves_deportivas || {};
         document.getElementById('contextLines').innerHTML = `
-            <p>${cl.clasificacion || ''}</p>
-            <p>${cl.dinamica || ''}</p>
-            <p>${cl.historial || ''}</p>
-            ${cl.tendencia ? `<p>${cl.tendencia}</p>` : ''}
+            <p>${escaparHtml(cl.clasificacion || '')}</p>
+            <p>${escaparHtml(cl.dinamica || '')}</p>
+            <p>${escaparHtml(cl.historial || '')}</p>
+            ${cl.tendencia ? `<p>${escaparHtml(cl.tendencia)}</p>` : ''}
         `;
 
         const alertBox = document.getElementById('contextAlert');
@@ -1157,44 +1185,43 @@
 
         renderizarBarrasPoisson();
 
-        // Tabla comparativa
         document.getElementById('compTable').innerHTML = `
             <thead>
                 <tr>
-                    <th style="text-align:left;">${sl.equipo} (Local)</th>
+                    <th style="text-align:left;">${escaparHtml(sl.equipo || 'Local')} (Local)</th>
                     <th>Métrica</th>
-                    <th style="text-align:right;">${sv.equipo} (Visita)</th>
+                    <th style="text-align:right;">${escaparHtml(sv.equipo || 'Visita')} (Visita)</th>
                 </tr>
             </thead>
             <tbody>
-                <tr><td>${sl.pct_ganar}%</td><td>% Victorias</td><td>${sv.pct_ganar}%</td></tr>
-                <tr><td>${sl.pct_doble_oport}%</td><td>Doble Oportunidad</td><td>${sv.pct_doble_oport}%</td></tr>
-                <tr><td>${sl.prom_goles_favor}</td><td>Goles a Favor</td><td>${sv.prom_goles_favor}</td></tr>
-                <tr><td>${sl.prom_goles_contra}</td><td>Goles Recibidos</td><td>${sv.prom_goles_contra}</td></tr>
-                <tr><td>${sl.pct_btts}%</td><td>Ambos Anotan</td><td>${sv.pct_btts}%</td></tr>
-                <tr><td>${sl.pct_clean_sheet}%</td><td>Portería a Cero</td><td>${sv.pct_clean_sheet}%</td></tr>
+                <tr><td>${sl.pct_ganar ?? '-'}%</td><td>% Victorias</td><td>${sv.pct_ganar ?? '-'}%</td></tr>
+                <tr><td>${sl.pct_doble_oport ?? '-'}%</td><td>Doble Oportunidad</td><td>${sv.pct_doble_oport ?? '-'}%</td></tr>
+                <tr><td>${sl.prom_goles_favor ?? '-'}</td><td>Goles a Favor</td><td>${sv.prom_goles_favor ?? '-'}</td></tr>
+                <tr><td>${sl.prom_goles_contra ?? '-'}</td><td>Goles Recibidos</td><td>${sv.prom_goles_contra ?? '-'}</td></tr>
+                <tr><td>${sl.pct_btts ?? '-'}%</td><td>Ambos Anotan</td><td>${sv.pct_btts ?? '-'}%</td></tr>
+                <tr><td>${sl.pct_clean_sheet ?? '-'}%</td><td>Portería a Cero</td><td>${sv.pct_clean_sheet ?? '-'}%</td></tr>
                 ${sl.tiene_stats_avanzadas ? `
-                    <tr><td>${sl.prom_corners_favor}</td><td>Córners a Favor</td><td>${sv.prom_corners_favor}</td></tr>
-                    <tr><td>${sl.prom_tiros_arco_favor}</td><td>Tiros al Arco</td><td>${sv.prom_tiros_arco_favor}</td></tr>
-                    <tr><td>${sl.prom_amarillas}</td><td>Amarillas / Partido</td><td>${sv.prom_amarillas}</td></tr>
+                    <tr><td>${sl.prom_corners_favor ?? '-'}</td><td>Córners a Favor</td><td>${sv.prom_corners_favor ?? '-'}</td></tr>
+                    <tr><td>${sl.prom_tiros_arco_favor ?? '-'}</td><td>Tiros al Arco</td><td>${sv.prom_tiros_arco_favor ?? '-'}</td></tr>
+                    <tr><td>${sl.prom_amarillas ?? '-'}</td><td>Amarillas / Partido</td><td>${sv.prom_amarillas ?? '-'}</td></tr>
                 ` : ''}
             </tbody>
         `;
 
-        // H2H
         const h2h = d.h2h || { total: 0, partidos: [] };
-        if (h2h.total === 0) {
+        const partidosH2h = Array.isArray(h2h.partidos) ? h2h.partidos : [];
+        if (!h2h.total || partidosH2h.length === 0) {
             document.getElementById('h2hContainer').innerHTML = `<p style="color:var(--text-secondary); font-size:0.84rem;">No hay enfrentamientos directos registrados recientemente entre ambos clubes.</p>`;
         } else {
             document.getElementById('h2hContainer').innerHTML = `
                 <div style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:10px;">
-                    Últimos ${h2h.total} duelos: <b>${h2h.victorias_local}G</b> ${sl.equipo} • <b>${h2h.empates}E</b> • <b>${h2h.victorias_visita}G</b> ${sv.equipo}
+                    Últimos ${h2h.total} duelos: <b>${h2h.victorias_local || 0}G</b> ${escaparHtml(sl.equipo || '')} • <b>${h2h.empates || 0}E</b> • <b>${h2h.victorias_visita || 0}G</b> ${escaparHtml(sv.equipo || '')}
                 </div>
-                ${h2h.partidos.map(p => `
+                ${partidosH2h.map(p => `
                     <div class="h2h-item">
-                        <span style="color:var(--text-secondary);">${p.fecha}</span>
-                        <span>${p.local} vs ${p.visita}</span>
-                        <span class="h2h-score">${p.goles_local} - ${p.goles_visita}</span>
+                        <span style="color:var(--text-secondary);">${escaparHtml(p.fecha || '')}</span>
+                        <span>${escaparHtml(p.local || '')} vs ${escaparHtml(p.visita || '')}</span>
+                        <span class="h2h-score">${escaparHtml(p.goles_local)} - ${escaparHtml(p.goles_visita)}</span>
                     </div>
                 `).join('')}
             `;
@@ -1202,8 +1229,9 @@
     }
 
     function renderizarBarrasPoisson() {
-        const filtrados = prediccionData.mercados.filter(m => {
-            const nom = m.mercado.toLowerCase();
+        const mercados = Array.isArray(prediccionData?.mercados) ? prediccionData.mercados : [];
+        const filtrados = mercados.filter(m => {
+            const nom = String(m.mercado || '').toLowerCase();
             if (catActual === 'betano') return m.probabilidad >= 68.0 && m.probabilidad <= 85.5;
             if (catActual === 'resultado') return nom.includes('gana') || nom.includes('empate');
             if (catActual === 'goles') return nom.includes('gol') || nom.includes('btts');
@@ -1219,26 +1247,27 @@
         }
 
         document.getElementById('poissonBarsContainer').innerHTML = filtrados.map(m => {
+            const prob = Number(m.probabilidad) || 0;
             let color = 'var(--text-secondary)';
             let tag = '';
-            if (m.probabilidad > 85.5) {
+            if (prob > 85.5) {
                 color = 'var(--emerald)';
                 tag = `<span style="font-size:0.7rem; padding:1px 7px; border-radius:5px; background:rgba(148,163,184,0.14); color:var(--text-secondary); margin-left:6px;">Cuota baja</span>`;
-            } else if (m.probabilidad >= 68.0) {
+            } else if (prob >= 68.0) {
                 color = 'var(--emerald)';
                 tag = `<span style="font-size:0.7rem; padding:1px 7px; border-radius:5px; background:var(--emerald-glow); color:var(--emerald); margin-left:6px;">✅ Rango Betano</span>`;
-            } else if (m.probabilidad >= 55.0) {
+            } else if (prob >= 55.0) {
                 color = 'var(--amber)';
             }
 
             return `
                 <div class="prob-row">
                     <div class="prob-head">
-                        <span>${m.mercado}${tag}</span>
-                        <span class="prob-pct" style="color:${color};">${m.probabilidad.toFixed(1)}%</span>
+                        <span>${escaparHtml(m.mercado)}${tag}</span>
+                        <span class="prob-pct" style="color:${color};">${prob.toFixed(1)}%</span>
                     </div>
                     <div class="prob-track">
-                        <div class="prob-fill" style="width:${m.probabilidad}%; background:${color};"></div>
+                        <div class="prob-fill" style="width:${Math.max(0, Math.min(100, prob))}%; background:${color};"></div>
                     </div>
                 </div>
             `;
@@ -1253,20 +1282,27 @@
             const hitEl = document.getElementById('brainHitRate');
             const bodyEl = document.getElementById('brainBody');
 
-            hitEl.textContent = `Hit Rate: ${m.hit_rate_pct || 0}% (${m.aciertos_top_mercado || 0}/${m.total_mercados_evaluados || 0})`;
+            hitEl.textContent = `Hit Rate: ${m.hit_rate_pct ?? 0}% (${m.aciertos_top_mercado ?? 0}/${m.total_mercados_evaluados ?? 0})`;
 
             const ligasCalibradas = Object.keys(data.factores_por_liga || {});
             const calText = ligasCalibradas.length > 0
-                ? `<div style="margin-bottom:8px; color:var(--emerald);">⚙️ Ligas calibradas automáticamente: <b>${ligasCalibradas.join(', ')}</b></div>`
-                : `<div style="margin-bottom:8px;">📊 En memoria: <b>${data.total_en_memoria || 0}</b> partidos (se calibra a partir de 2 auditados por liga).</div>`;
+                ? `<div style="margin-bottom:8px; color:var(--emerald);">⚙️ Ligas calibradas automáticamente: <b>${escaparHtml(ligasCalibradas.join(', '))}</b></div>`
+                : `<div style="margin-bottom:8px;">📊 En memoria: <b>${data.total_en_memoria ?? 0}</b> partidos (se calibra a partir de 2 auditados por liga).</div>`;
 
-            const ultimosHtml = (data.ultimos_auditados || []).slice().reverse().map(u => {
-                const pills = u.aciertos.map(a =>
-                    `<span style="display:inline-block; margin:2px 4px 2px 0; padding:2px 6px; border-radius:4px; font-size:0.74rem; background:${a.acertado ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color:${a.acertado ? '#34d399' : '#f87171'};">${a.acertado ? '✓' : '✗'} ${a.mercado}</span>`
-                ).join('');
+            const ultimos = Array.isArray(data.ultimos_auditados) ? data.ultimos_auditados.slice().reverse() : [];
+            const ultimosHtml = ultimos.map(u => {
+                let pillsHtml = '';
+                if (Array.isArray(u.aciertos)) {
+                    pillsHtml = u.aciertos.map(a =>
+                        `<span style="display:inline-block; margin:2px 4px 2px 0; padding:2px 6px; border-radius:4px; font-size:0.74rem; background:${a.acertado ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color:${a.acertado ? '#34d399' : '#f87171'};">${a.acertado ? '✓' : '✗'} ${escaparHtml(a.mercado || '')}</span>`
+                    ).join('');
+                } else if (typeof u.acierto === 'boolean') {
+                    pillsHtml = `<span style="display:inline-block; margin:2px 4px 2px 0; padding:2px 6px; border-radius:4px; font-size:0.74rem; background:${u.acierto ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color:${u.acierto ? '#34d399' : '#f87171'};">${u.acertado ? '✓ Acierto top mercado' : '✗ Fallo top mercado'}</span>`;
+                }
+
                 return `<div style="padding:6px 0; border-top:1px solid rgba(255,255,255,0.06);">
-                    <div><b>${u.partido}</b> (${u.marcador}) <span style="opacity:0.7;">• ${u.liga}</span></div>
-                    <div style="margin-top:3px;">${pills}</div>
+                    <div><b>${escaparHtml(u.partido || '')}</b> ${u.marcador ? `(${escaparHtml(u.marcador)})` : ''} <span style="opacity:0.7;">• ${escaparHtml(u.liga || '')}</span></div>
+                    ${pillsHtml ? `<div style="margin-top:3px;">${pillsHtml}</div>` : ''}
                 </div>`;
             }).join('');
 
