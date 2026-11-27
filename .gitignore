@@ -8,3 +8,4 @@ data/cache/espn_*.json
 data/cache/*.csv
 data/cache/*.json
 !data/cache/ml_models/
+data/cache/ml_models/*.joblib

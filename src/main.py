@@ -23,6 +23,76 @@ from src.services.ml_engine import predecir_probabilidades_ml
 from src.domain.poisson_engine import generar_prediccion_2026
 
 
+def _evaluar_riesgo_visita_cero(stats_l: dict, stats_v: dict, esperados: dict) -> str | None:
+    """Detecta escenarios donde '+0.5 Goles Visita' tiene riesgo alto de quedarse en 0."""
+    clean_sheet_local = float((stats_l.get("local") or {}).get("pct_clean_sheet") or 0)
+    tiros_visita = float((stats_v.get("visita") or {}).get("prom_tiros_arco_favor") or 0)
+    goles_visita_esp = float((esperados or {}).get("goles_visita") or 0)
+
+    motivos = []
+    if clean_sheet_local >= 32.0:
+        motivos.append(f"local con {clean_sheet_local}% de portería a cero en casa")
+    if tiros_visita < 3.8:
+        motivos.append(f"visita con {tiros_visita} tiros al arco fuera")
+    if goles_visita_esp < 1.05:
+        motivos.append(f"xG visitante bajo ({goles_visita_esp})")
+
+    if motivos:
+        return (
+            "Riesgo de visitante sin gol (" + ", ".join(motivos) + "). "
+            "Evita '+0.5 Goles Visita' a cuota baja; prioriza líneas de partido, córners o tarjetas."
+        )
+    return None
+
+
+def _enriquecer_mercados(
+    probs_ordenadas: list[dict],
+    stats_l: dict,
+    stats_v: dict,
+    esperados: dict,
+    alerta_visita: str | None,
+    margen_seguridad: float = 0.06,
+) -> list[dict]:
+    """Añade cuota justa, cuota mínima para EV+ y clasificación de perfil rentable."""
+    nombre_visita = str((stats_v or {}).get("equipo") or "").lower()
+    enriquecidos = []
+
+    for item in probs_ordenadas:
+        mercado = item["mercado"]
+        prob = float(item["probabilidad"])
+        alerta_item = None
+
+        if alerta_visita and "+0.5 goles" in mercado.lower() and nombre_visita and nombre_visita in mercado.lower():
+            prob = round(prob * 0.90, 1)
+            alerta_item = alerta_visita
+
+        prob_dec = max(min(prob / 100.0, 0.99), 0.01)
+        cuota_justa = round(1.0 / prob_dec, 2)
+        prob_objetivo = max(prob_dec - margen_seguridad, 0.05)
+        cuota_minima_ev = round(1.0 / prob_objetivo, 2)
+
+        if cuota_minima_ev < 1.25:
+            perfil = "CUOTA_BAJA"
+        elif 1.35 <= cuota_minima_ev <= 1.85 and prob >= 65.0 and not alerta_item:
+            perfil = "DOBLE_RENTABLE"
+        elif cuota_minima_ev > 1.85 and prob >= 55.0 and not alerta_item:
+            perfil = "SIMPLE_VALOR"
+        else:
+            perfil = "ESTANDAR"
+
+        enriquecidos.append({
+            "mercado": mercado,
+            "probabilidad": prob,
+            "cuota_justa": cuota_justa,
+            "cuota_minima_ev": cuota_minima_ev,
+            "perfil_ticket": perfil,
+            "alerta": alerta_item,
+        })
+
+    enriquecidos.sort(key=lambda x: (x["alerta"] is None, x["probabilidad"]), reverse=True)
+    return enriquecidos
+
+
 def _calcular_prediccion_completa(liga: str, local: str, visita: str, ultimos_n: int = 0):
     """Ejecuta el motor híbrido (Poisson calibrado + Machine Learning) para un encuentro."""
     df = cargar_datos_liga(liga)
@@ -63,14 +133,27 @@ def _calcular_prediccion_completa(liga: str, local: str, visita: str, ultimos_n:
         for k, v in sorted(probs_finales.items(), key=lambda x: x[1], reverse=True)
     ]
 
+    claves = dict(prediccion["claves_deportivas"])
+    alerta_visita = _evaluar_riesgo_visita_cero(stats_l, stats_v, prediccion["esperados"])
+    if alerta_visita:
+        claves["alerta_riesgo_visita"] = alerta_visita
+
+    mercados_enriquecidos = _enriquecer_mercados(
+        probs_ordenadas,
+        stats_l,
+        stats_v,
+        prediccion["esperados"],
+        alerta_visita,
+    )
+
     return {
         "stats_local": stats_l,
         "stats_visita": stats_v,
         "esperados": prediccion["esperados"],
-        "mercados": probs_ordenadas,
+        "mercados": mercados_enriquecidos,
         "h2h": historial_h2h,
         "contexto": contexto_tabla,
-        "claves_deportivas": prediccion["claves_deportivas"],
+        "claves_deportivas": claves,
         "calibracion_activa": bool(factores_liga),
         "ml_activo": bool(probs_ml),
     }
@@ -156,7 +239,7 @@ def disparar_auditoria():
 
 @app.get("/api/ticket-optimo")
 def generar_ticket_optimo(fecha: str = None):
-    """Construye combinadas seguras (1 selección por partido) filtrando el rango Betano (68%-85.5%)."""
+    """Construye combinadas seguras (1 selección por partido) priorizando cuotas rentables sin alerta."""
     partidos = obtener_cartelera_hoy(cargar_datos_liga, fecha)
     candidatos = []
 
@@ -175,17 +258,22 @@ def generar_ticket_optimo(fecha: str = None):
             if res["stats_local"].get("pj", 1) == 0 and res["stats_visita"].get("pj", 1) == 0:
                 continue
 
-            # Buscar el mejor mercado en rango óptimo Betano (68% - 85.5%)
+            # Buscar mercado sin alerta y con cuota competitiva (>= 1.32) evitando cuotas muy bajas
             mejor_pick = None
             for m in res["mercados"]:
                 prob = m["probabilidad"]
                 nom = m["mercado"].lower()
-                if 68.5 <= prob <= 85.0 and "12 (" not in nom:
-                    mejor_pick = m
+                cuota_est = m.get("cuota_minima_ev") or (round(100.0 / prob, 2) if prob > 0 else 0)
+                if (
+                    not m.get("alerta")
+                    and 62.0 <= prob <= 82.0
+                    and cuota_est >= 1.32
+                    and "12 (" not in nom
+                ):
+                    mejor_pick = {**m, "cuota_estimada": cuota_est}
                     break
 
             if mejor_pick:
-                cuota_est = round(100.0 / mejor_pick["probabilidad"], 2)
                 candidatos.append({
                     "partido": f"{p['local_display']} vs {p['visita_display']}",
                     "local_csv": local,
@@ -194,13 +282,13 @@ def generar_ticket_optimo(fecha: str = None):
                     "hora_utc": p.get("hora_utc", ""),
                     "mercado": mejor_pick["mercado"],
                     "probabilidad": mejor_pick["probabilidad"],
-                    "cuota_estimada": cuota_est,
+                    "cuota_estimada": mejor_pick["cuota_estimada"],
+                    "perfil_ticket": mejor_pick.get("perfil_ticket", "ESTANDAR"),
                     "marcador_previsto": res["esperados"]["marcador_probable"],
                 })
         except Exception:
             continue
 
-    # Ordenar de mayor a menor probabilidad asegurando diversidad de categorías
     candidatos.sort(key=lambda x: x["probabilidad"], reverse=True)
 
     def _armar_combo(lista_picks: list, max_legs: int):
@@ -238,6 +326,7 @@ def generar_ticket_optimo(fecha: str = None):
 
     return {
         "total_analizados": len(candidatos),
+        "ticket_seguro_2": _armar_combo(candidatos, 2),
         "ticket_seguro_3": _armar_combo(candidatos, 3),
         "ticket_equilibrado_4": _armar_combo(candidatos, 4),
     }
